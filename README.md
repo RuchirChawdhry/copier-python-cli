@@ -21,7 +21,7 @@ Commit the generated `uv.lock` for reproducible development and CI.
 
 ## What's generated?
 
-- Installable `src/` package using Hatchling and an executable Cyclopts command.
+- Installable `src/` package using uv_build and an executable Cyclopts command.
 - Rich terminal output plus a safe ruamel.yaml config reader and sample YAML.
 - Real pytest tests for logic and CLI, Ruff formatting/lint settings, `.python-version`.
 - `AGENTS.md` with repo-local TDD and agent-environment guidance.

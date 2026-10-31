@@ -38,6 +38,7 @@ def test_generated_package_metadata(generated: Path) -> None:
     with (generated / "pyproject.toml").open("rb") as stream:
         config = tomllib.load(stream)
     assert config["project"]["name"] == "sample-cli"
+    assert config["build-system"]["build-backend"] == "uv_build"
     assert config["project"]["requires-python"] == ">=3.14"
     assert config["project"]["scripts"]["sample-cli"] == "sample_cli.cli:app"
     assert all(

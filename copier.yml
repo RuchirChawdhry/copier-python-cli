@@ -11,16 +11,28 @@ project_slug:
   type: str
   help: Distribution name (lowercase, hyphenated)
   default: "{{ project_name | lower | replace(' ', '-') | replace('_', '-') }}"
+  validator: >-
+    {% if not (project_slug | regex_search('^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$')) %}
+    Use lowercase letters, digits, and single hyphens, starting with a letter.
+    {% endif %}
 
 package_name:
   type: str
   help: Importable Python package name
   default: "{{ project_slug | replace('-', '_') }}"
+  validator: >-
+    {% if not (package_name | regex_search('^[a-z][a-z0-9_]*$')) %}
+    Use a lowercase Python package identifier (letters, digits, underscores).
+    {% endif %}
 
 cli_command:
   type: str
   help: Executable command installed by uv
   default: "{{ project_slug }}"
+  validator: >-
+    {% if not (cli_command | regex_search('^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$')) %}
+    Use a lowercase CLI command with single hyphens.
+    {% endif %}
 
 description:
   type: str
