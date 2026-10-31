@@ -1,0 +1,31 @@
+[project]
+name = "{{ project_name }}"
+version = "0.1.0"
+description = {{ description | to_json }}
+readme = "README.md"
+requires-python = ">={{ python_version }}"
+license = "MIT"
+dependencies = [
+    "cyclopts>=3,<5",
+    "rich>=13,<15",
+]
+
+[project.scripts]
+{{ project_name }} = "{{ project_name | replace('-', '_') }}.cli:app"
+
+[build-system]
+requires = ["uv_build>=0.13.6,<0.14"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8,<10",
+    "ruff>=0.12",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py{{ python_version | replace('.', '') }}"
