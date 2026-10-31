@@ -1,0 +1,17 @@
+"""Command-line interface.
+
+Add commands here. Keep reusable business logic in separate modules.
+"""
+
+from cyclopts import App
+from rich.console import Console
+from rich.markup import escape
+
+app = App(help={{ description | to_json }})
+console = Console()
+
+
+@app.command
+def greet(name: str = "World") -> None:
+    """Greet someone by name."""
+    console.print(f"Hello, [bold cyan]{escape(name)}[/bold cyan]!")

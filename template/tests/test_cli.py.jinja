@@ -1,0 +1,31 @@
+"""CLI contract tests: exercise the installed module as a user would."""
+
+import subprocess
+import sys
+
+
+def invoke(*args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, "-m", "{{ project_name | replace('-', '_') }}", *args],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def test_help_lists_greet_command() -> None:
+    result = invoke("--help")
+    assert result.returncode == 0, result.stderr
+    assert "greet" in result.stdout
+
+
+def test_greet_uses_provided_name() -> None:
+    result = invoke("greet", "Ada")
+    assert result.returncode == 0, result.stderr
+    assert "Hello, Ada!" in result.stdout
+
+
+def test_greet_escapes_rich_markup() -> None:
+    result = invoke("greet", "[red]Ada[/red]")
+    assert result.returncode == 0, result.stderr
+    assert "Hello, [red]Ada[/red]!" in result.stdout
