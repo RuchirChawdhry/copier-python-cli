@@ -1,0 +1,29 @@
+"""Cyclopts command definitions; put business logic in separate modules."""
+
+from pathlib import Path
+
+from cyclopts import App
+from rich.console import Console
+from rich.table import Table
+
+from .config import load_config
+
+app = App(name="{{ cli_command }}")
+
+
+@app.command
+def hello(name: str = "world") -> None:
+    """Print a friendly greeting."""
+    Console().print(f"Hello, {name}!")
+
+
+@app.command
+def show_config(path: Path = Path("config.example.yml")) -> None:
+    """Display the keys and values in a YAML configuration file."""
+    config = load_config(path)
+    table = Table(title="Configuration")
+    table.add_column("Key", style="cyan")
+    table.add_column("Value")
+    for key, value in config.items():
+        table.add_row(str(key), str(value))
+    Console().print(table)

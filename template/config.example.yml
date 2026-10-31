@@ -1,0 +1,3 @@
+project: example
+log_level: info
+retries: 3

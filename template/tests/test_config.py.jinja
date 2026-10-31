@@ -1,0 +1,19 @@
+from pathlib import Path
+
+import pytest
+
+from {{ package_name }}.config import load_config
+
+
+def test_load_yaml_mapping(tmp_path: Path) -> None:
+    config_file = tmp_path / "config.yml"
+    config_file.write_text("enabled: true\nretries: 3\n", encoding="utf-8")
+    assert load_config(config_file) == {"enabled": True, "retries": 3}
+
+
+@pytest.mark.parametrize("content", ["", "- one\n- two\n", "hello\n"])
+def test_reject_non_mapping(tmp_path: Path, content: str) -> None:
+    config_file = tmp_path / "config.yml"
+    config_file.write_text(content, encoding="utf-8")
+    with pytest.raises(ValueError, match="YAML mapping"):
+        load_config(config_file)

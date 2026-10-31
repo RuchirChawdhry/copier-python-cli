@@ -1,67 +1,60 @@
 # copier-python-cli
 
-A minimal, agent-ready **Copier template for Python CLI apps**, powered by **uv**, **Cyclopts**, **Rich**, **Ruff**, and **pytest**. Fast to bootstrap, easy to extend, and test-first by default.
+A lean, reusable Copier template for agent-ready Python CLI applications. ⚡
 
-## Generate a new CLI
+**Stack:** uv · Python 3.14.7 · Cyclopts · ruamel.yaml · Rich · Ruff · pytest.
 
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then run:
+## Generate a project
 
 ```sh
-uvx --from copier copier copy gh:RuchirChawdhry/copier-python-cli ./my-cli
-cd my-cli
-uv sync
-uv run my-cli --help
-uv run my-cli greet Ada
+uvx copier copy gh:RuchirChawdhry/copier-python-cli my-new-cli
+cd my-new-cli
+uv sync --group dev
+uv run pytest -q
+uv run ruff check .
+uv run ruff format --check .
 ```
 
-`my-cli` in these examples assumes you enter `my-cli` as the project name when prompted. Copier asks for the CLI name, description, author and Python version. The name determines both the installed command (`my-cli`) and importable Python package (`my_cli`). No package-manager choices or post-generation hooks to maintain.
+Copier prompts for project name, distribution/import names, CLI executable, description,
+and author. Use `-d project_name='My Tool'` or `--defaults` for unattended setup.
+Commit the generated `uv.lock` for reproducible development and CI.
 
-## Generated project
+## What's generated?
 
-```text
-my-cli/
-├── .github/workflows/ci.yml
-├── .copier-answers.yml
-├── .gitignore
-├── .python-version
-├── AGENTS.md
-├── LICENSE
-├── README.md
-├── pyproject.toml
-├── src/my_cli/
-│   ├── __init__.py
-│   ├── __main__.py
-│   └── cli.py
-└── tests/test_cli.py
-```
+- Installable `src/` package using Hatchling and an executable Cyclopts command.
+- Rich terminal output plus a safe ruamel.yaml config reader and sample YAML.
+- Real pytest tests for logic and CLI, Ruff formatting/lint settings, `.python-version`.
+- `AGENTS.md` with repo-local TDD and agent-environment guidance.
+- PR-only GitHub Actions callers for the central **python-cli** and **python-build** workflows.
+- MIT license, `.gitignore`, Copier answers for future `copier update`.
 
-### Daily commands
+## Why the template repo never runs these workflows
 
-| Task | Command |
-| --- | --- |
-| Install dependencies | `uv sync` |
-| Run CLI | `uv run my-cli --help` |
-| Add runtime dependency | `uv add <package>` |
-| Add development dependency | `uv add --dev <package>` |
-| Test | `uv run pytest -q` |
-| Lint | `uv run ruff check .` |
-| Format | `uv run ruff format .` |
-| Build | `uv build` |
+The workflow source lives in `template/.github/workflows/ci.yml.jinja`, **not**
+`.github/workflows/` at this repository's root. GitHub only detects workflows in the
+root `.github/workflows/`, so nothing is activated here. Copier emits the normal
+`.github/workflows/ci.yml` only into generated projects. Generated workflows run on
+**pull requests only**, never `push`, `schedule`, or manual dispatch.
 
-The generated project installs itself as a package using `uv_build` with a `src/` layout. Its GitHub Actions workflow runs quality checks on pull requests and pushes to `main`.
+The CI jobs reference:
 
-## Test the template itself
+- [`python-cli.yml`](https://github.com/RuchirChawdhry/ci-workflows/blob/main/.github/workflows/python-cli.yml) for uv, Ruff, pytest, and help smoke test.
+- [`python-build.yml`](https://github.com/RuchirChawdhry/ci-workflows/blob/main/.github/workflows/python-build.yml) for wheel/sdist validation and CLI installation smoke test.
+
+They currently follow the `main` branch. Pin to a release tag or commit SHA if strict
+reproducibility is required; the user-managed central workflows remain the source of truth.
+
+## Test this template itself
 
 ```sh
 uv run --no-project --with copier --with pytest pytest tests -q
 ```
 
-The template tests generate temporary projects, inspect metadata and file names, and exercise `uv sync`, Ruff, pytest, the installed CLI, and `uv build`. The checks also run automatically in this repository's pull requests.
+The tests generate a sample application and assert package metadata, imports,
+Copier update context, and isolated PR-only workflow placement. No GitHub Actions
+workflows are registered in this template repository.
 
-## Updating generated projects
+## Philosophy
 
-Commit `.copier-answers.yml` and `uv.lock` in each generated application. Once this template has versioned release tags, run `copier update` inside a generated project to incorporate template improvements while retaining project changes.
-
-## License
-
-MIT. See [LICENSE](LICENSE).
+**Less setup. More building.** Keep the template small, projects isolated, and agents
+focused on tests and working software.

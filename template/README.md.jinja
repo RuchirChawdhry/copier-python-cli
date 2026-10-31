@@ -2,40 +2,41 @@
 
 {{ description }}
 
-A lightweight Python CLI powered by **uv**, **Cyclopts**, **Rich**, **Ruff**, and **pytest**.
+A Python 3.14.7 command-line project using **uv**, **Cyclopts**, **Rich**, **ruamel.yaml**, **Ruff**, and **pytest**.
 
-## Get started
-
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then:
+## Start
 
 ```sh
-uv sync
-uv run {{ project_name }} --help
-uv run {{ project_name }} greet Ada
+uv sync --group dev
+uv run {{ cli_command }} --help
+uv run {{ cli_command }} hello --name developer
+uv run {{ cli_command }} show-config --path config.example.yml
 ```
 
-Each project has its own `.venv` managed by uv. Commit `uv.lock` after the first `uv sync`.
+Commit the generated `uv.lock` for repeatable dependency resolution and CI runs.
 
-## Development
+## Develop
 
 ```sh
 uv run pytest -q
 uv run ruff check .
 uv run ruff format --check .
-uv run ruff format .
 uv build
 ```
 
-The CLI entry point is `src/{{ project_name | replace('-', '_') }}/cli.py`. Put reusable logic in separate modules, and write a failing test before changing behavior. See [AGENTS.md](AGENTS.md) for agent conventions.
+`src/{{ package_name }}/cli.py` is the command interface. Put logic in separate modules and test those first.
+See `AGENTS.md` for TDD and environment isolation conventions.
 
-## Template updates
+## Automation
 
-This project was generated with Copier. Keep `.copier-answers.yml` committed to support future updates once the template publishes versioned tags:
+`.github/workflows/ci.yml` delegates PR validation and distribution-building to
+[RuchirChawdhry/ci-workflows](https://github.com/RuchirChawdhry/ci-workflows).
+It runs for pull requests, not pushes or schedules. No PyPI publishing is enabled.
+
+## Updating from the Copier template
+
+The `.copier-answers.yml` tracks the source template and your answers:
 
 ```sh
-copier update
+uvx copier update
 ```
-
-## License
-
-MIT. See [LICENSE](LICENSE).

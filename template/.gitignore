@@ -3,12 +3,8 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
-.coverage*
-htmlcov/
+*.egg-info/
 build/
 dist/
-*.egg-info/
+.coverage
 .env
-.env.*
-!.env.example
-# Commit uv.lock for reproducible application builds.

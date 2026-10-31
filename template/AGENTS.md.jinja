@@ -1,0 +1,21 @@
+# Agent development guide: {{ project_name }}
+
+This repository is an independent Python CLI project. Do not change the global Python
+installation, other project virtual environments, or shared CI workflow repository.
+
+## Workflow
+
+1. Write a failing pytest test for the behavior you intend to change.
+2. Implement the smallest change that passes the test.
+3. Refactor, then run `uv run ruff check .`, `uv run ruff format --check .`, and `uv run pytest -q`.
+4. Keep the entrypoint thin: `src/{{ package_name }}/cli.py` owns CLI interaction; other modules own logic.
+
+## Tooling
+
+- Interpreter: Python 3.14.7 via `.python-version` and uv.
+- Dependencies: `uv sync --group dev` (commit `uv.lock`).
+- CLI: Cyclopts; terminal output: Rich; YAML: ruamel.yaml with safe loading.
+- Test runner: pytest; lint/format: Ruff.
+- CI: PR-only callers of `RuchirChawdhry/ci-workflows`. Never duplicate shared workflow logic here.
+
+Avoid fetching dependencies globally or modifying system configuration.
