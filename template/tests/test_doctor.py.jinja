@@ -1,6 +1,10 @@
 from pathlib import Path
 
+import pytest
+from ruamel.yaml.error import YAMLError
+
 from {{ package_name }} import doctor
+from {{ package_name }}.config import load_config
 
 
 def test_doctor_is_read_only(monkeypatch, tmp_path: Path) -> None:
@@ -19,3 +23,17 @@ def test_bad_database(tmp_path: Path) -> None:
     path.write_text("not sqlite", encoding="utf-8")
     assert not doctor.check_database(path)["ok"]
     assert path.read_text(encoding="utf-8") == "not sqlite"
+
+
+def test_doctor_preserves_yaml_diagnostics(monkeypatch, tmp_path: Path) -> None:
+    path = tmp_path / "config.yml"
+    path.write_text("logging: [invalid-value\n", encoding="utf-8")
+    monkeypatch.setattr(doctor, "default_config_path", lambda: path)
+    monkeypatch.setattr(doctor, "default_log_path", lambda: tmp_path / "app.log")
+    monkeypatch.setattr(doctor, "default_database_path", lambda: tmp_path / "data.sqlite3")
+    monkeypatch.setattr(doctor, "read_settings", lambda: load_config(path))
+    with pytest.raises(YAMLError) as error:
+        load_config(path)
+    result = next(item for item in doctor.run_checks() if item["name"] == "config")
+    assert result["ok"] is False
+    assert result["detail"] == f"{path}: {error.value}"
