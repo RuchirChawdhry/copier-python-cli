@@ -39,8 +39,10 @@ This repository has a root workflow, `.github/workflows/template-ci.yml`,
 which calls the central [Copier validation workflow](https://github.com/RuchirChawdhry/ci-workflows/blob/main/.github/workflows/copier-ci.yml).
 It runs when a pull request is opened, updated or reopened. It tests the template
 contracts, renders the current revision, runs Ruff and pytest on the generated
-project, builds and checks distributions, and installs the wheel for a CLI help
-smoke test on Ubuntu 24.04. New commits cancel older runs for the same PR.
+project, builds and checks distributions, and installs the wheel for functional smoke tests on Ubuntu 24.04.
+The central workflow explicitly runs `tests/smoke_installed.py` against the
+installed console script via `CLI_EXECUTABLE`, outside the generated project.
+The tests cover machine output, configuration, SQLite WAL and doctor diagnostics. New commits cancel older runs for the same PR.
 
 The generated application's independent workflow lives under
 `template/.github/workflows/ci.yml.jinja`. Copier renders it into the generated
