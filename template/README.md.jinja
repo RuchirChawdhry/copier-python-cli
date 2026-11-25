@@ -103,16 +103,17 @@ check. Any failed check gives exit status 1, with all results still emitted.
 ## Persistence
 
 `database.py` uses Python's built-in sqlite3 with parameterized SQL, transactions,
-foreign keys, a schema version and closed connections. The default database is
+foreign keys, WAL journal mode by default, a schema version and closed connections. The default database is
 `data.sqlite3` in the platform-specific user data directory. Schema initialization
 is lazy; help, diagnostics and config commands do not initialize it.
 The starter key/value table demonstrates the persistence API; replace or extend it
-with project-specific tables and explicit schema migrations.
+with project-specific tables and explicit schema migrations. Record mutations and
+lookups are Python APIs, not generic public CLI commands. WAL is enabled before
+starting a transaction, including when opening an existing rollback-journal database.
+Use a local filesystem for SQLite WAL; do not copy a live database without its WAL state.
 
 ```sh
 uv run {{ cli_command }} db-path
-uv run {{ cli_command }} db-set example value --json
-uv run {{ cli_command }} db-get example --json
 uv run {{ cli_command }} db-list --jsonl
 ```
 

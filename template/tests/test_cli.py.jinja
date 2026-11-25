@@ -6,6 +6,7 @@ from pathlib import Path
 from loguru import logger
 
 from {{ package_name }}.cli import hello
+from {{ package_name }}.database import set_record
 
 
 def test_hello(capsys, tmp_path: Path) -> None:
@@ -34,6 +35,10 @@ def test_module_help() -> None:
     assert "set-config" in result.stdout
     assert "--init-config" in result.stdout
     assert "--config-path" in result.stdout
+    assert "db-list" in result.stdout
+    assert "db-path" in result.stdout
+    assert "db-set" not in result.stdout
+    assert "db-get" not in result.stdout
 
 
 def test_config_commands(tmp_path: Path) -> None:
@@ -62,12 +67,12 @@ def test_machine_output(tmp_path: Path) -> None:
 
 
 def test_db_commands(tmp_path: Path) -> None:
-    path = str(tmp_path / "db.sqlite3")
-    run_cli("db-set", "b", "two", "--path", path, "--json")
-    run_cli("db-set", "a", "one", "--path", path, "--json")
-    result = run_cli("db-list", "--path", path, "--jsonl")
+    path = tmp_path / "db.sqlite3"
+    set_record("b", "two", path)
+    set_record("a", "one", path)
+    result = run_cli("db-list", "--path", str(path), "--jsonl")
     assert [json.loads(line)["key"] for line in result.stdout.splitlines()] == ["a", "b"]
-    assert json.loads(run_cli("db-get", "b", "--path", path, "--json").stdout)["value"] == "two"
+    assert json.loads(run_cli("db-list", "--path", str(path), "--json").stdout)[1]["value"] == "two"
 
 
 def test_conflict_prevents_write(tmp_path: Path) -> None:
@@ -77,9 +82,7 @@ def test_conflict_prevents_write(tmp_path: Path) -> None:
             sys.executable,
             "-m",
             "{{ package_name }}",
-            "db-set",
-            "key",
-            "value",
+            "db-list",
             "--path",
             str(path),
             "--json",

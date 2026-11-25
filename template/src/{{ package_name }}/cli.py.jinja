@@ -141,31 +141,6 @@ def db_path(*, options: OutputOptions | None = None) -> None:
 
 
 @app.command
-def db_set(
-    key: str, value: str, *, path: Path | None = None, options: OutputOptions | None = None
-) -> None:
-    """Insert or update a record in the local SQLite database."""
-    output = Output(options)
-    with output.guard():
-        output.note("Writing SQLite record")
-        output.emit(database.set_record(key, value, path))
-
-
-@app.command
-def db_get(
-    key: str, *, path: Path | None = None, options: OutputOptions | None = None
-) -> None:
-    """Retrieve a record by key."""
-    output = Output(options)
-    with output.guard():
-        output.note("Reading SQLite record")
-        record = database.get_record(key, path)
-        if record is None:
-            raise ValueError("Record not found")
-        output.emit(record)
-
-
-@app.command
 def db_list(*, path: Path | None = None, options: OutputOptions | None = None) -> None:
     """List records in deterministic key order."""
     output = Output(options)

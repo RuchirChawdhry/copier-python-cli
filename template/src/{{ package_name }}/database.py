@@ -23,6 +23,9 @@ def connect(path: Path | None = None) -> Iterator[sqlite3.Connection]:
     path.parent.mkdir(parents=True, exist_ok=True)
     with closing(sqlite3.connect(path, timeout=5, autocommit=True)) as db:
         db.row_factory = sqlite3.Row
+        mode = db.execute("PRAGMA journal_mode = WAL").fetchone()[0]
+        if mode.lower() != "wal":
+            raise sqlite3.OperationalError(f"Could not enable WAL: {mode}")
         db.execute("PRAGMA foreign_keys = ON")
         db.autocommit = False
         with db:
