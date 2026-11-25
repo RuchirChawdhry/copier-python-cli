@@ -25,14 +25,20 @@ def run_cli(tmp_path, monkeypatch):
     executable = os.environ["CLI_EXECUTABLE"]
 
     def run(*args, check=True):
-        return subprocess.run(
+        result = subprocess.run(
             [executable, *args],
             cwd=tmp_path,
             capture_output=True,
             text=True,
-            check=check,
+            check=False,
             timeout=30,
         )
+        if check:
+            assert result.returncode == 0, (
+                f"{result.args!r} exited {result.returncode}\n"
+                f"stdout: {result.stdout}\nstderr: {result.stderr}"
+            )
+        return result
 
     return run
 
