@@ -115,3 +115,14 @@ def test_config_path_uses_local_non_roaming_directory(monkeypatch, tmp_path: Pat
     monkeypatch.setattr(config, "user_config_path", user_config_path)
     assert config.default_config_path() == tmp_path / config.APP_NAME / "config.yml"
     assert not config.default_config_path().exists()
+
+
+def test_update_preserves_default_zero_verbosity(monkeypatch, tmp_path: Path) -> None:
+    path = tmp_path / "config.yml"
+    monkeypatch.setattr(config, "default_config_path", lambda: path)
+    init_config()
+    update_setting("logging.file_enabled", "false")
+    update_setting("cli.hello.name", "Ada")
+    settings = read_settings()
+    assert settings["logging"] == {"level": "INFO", "verbosity": 0, "file_enabled": False}
+    assert settings["cli"]["hello"]["name"] == "Ada"

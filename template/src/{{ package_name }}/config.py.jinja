@@ -39,7 +39,11 @@ class LoggingConfig:
         if not isinstance(self.level, str) or self.level.upper() not in LOG_LEVELS:
             raise ApplicationError(f"Logging level must be one of: {', '.join(LOG_LEVELS)}")
         self.level = self.level.upper()
-        if type(self.verbosity) is not int or self.verbosity not in range(len(CONSOLE_LEVELS)):
+        if (
+            not isinstance(self.verbosity, int)
+            or isinstance(self.verbosity, bool)
+            or self.verbosity not in range(len(CONSOLE_LEVELS))
+        ):
             raise ApplicationError("Logging verbosity must be an integer from 0 to 3")
         if type(self.file_enabled) is not bool:
             raise ApplicationError("logging.file_enabled must be a boolean")
