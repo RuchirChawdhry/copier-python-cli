@@ -167,9 +167,7 @@ def db_path(*, options: OutputOptions = DEFAULT_OUTPUT_OPTIONS) -> None:
 
 
 @app.command
-def db_list(
-    *, path: File | None = None, options: OutputOptions = DEFAULT_OUTPUT_OPTIONS
-) -> None:
+def db_list(*, path: File | None = None, options: OutputOptions = DEFAULT_OUTPUT_OPTIONS) -> None:
     """List records in deterministic key order."""
     output = Output(options)
     output.note("Listing SQLite records")

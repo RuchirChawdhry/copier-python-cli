@@ -166,8 +166,7 @@ def test_native_validation(args: list[str], monkeypatch, tmp_path: Path) -> None
 def test_yaml_command_defaults_and_overrides(tmp_path: Path) -> None:
     path = tmp_path / "settings.yml"
     path.write_text(
-        "logging:\n  file_enabled: false\n"
-        "cli:\n  hello:\n    name: Ada\n    verbosity: 1\n",
+        "logging:\n  file_enabled: false\ncli:\n  hello:\n    name: Ada\n    verbosity: 1\n",
         encoding="utf-8",
     )
     result = run_cli("hello", "--config", str(path), "--json")
@@ -187,9 +186,12 @@ def test_invalid_yaml_cli_default_is_rejected(tmp_path: Path) -> None:
         app.parse_args(["hello", "--config", str(path)], exit_on_error=False, print_error=False)
     # Config-management commands do not parse command defaults and can repair them.
     run_cli("set-config", "cli.hello.verbosity", "1", "--path", str(path))
-    assert json.loads(run_cli("--show-config", "--path", str(path), "--json").stdout)[
-        "cli"
-    ]["hello"]["verbosity"] == 1
+    assert (
+        json.loads(run_cli("--show-config", "--path", str(path), "--json").stdout)["cli"]["hello"][
+            "verbosity"
+        ]
+        == 1
+    )
 
 
 def test_platform_yaml_defaults(monkeypatch, tmp_path: Path) -> None:
