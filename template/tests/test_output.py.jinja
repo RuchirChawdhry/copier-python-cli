@@ -5,6 +5,7 @@ from pathlib import Path
 import orjson
 import pytest
 
+from {{ package_name }}.errors import ApplicationError
 from {{ package_name }}.output import Output, OutputOptions
 
 
@@ -65,9 +66,7 @@ def test_empty_jsonl(capsysbinary) -> None:
 
 def test_json_encoding_error(capsys) -> None:
     output = Output(OutputOptions(json=True))
-    with pytest.raises(SystemExit) as error, output.guard():
+    with pytest.raises(ApplicationError, match="Could not serialize JSON"):
         output.emit({"too_large": 2**80})
-    assert error.value.code == 1
     captured = capsys.readouterr()
-    assert captured.out == ""
-    assert "Error:" in captured.err
+    assert captured.out == captured.err == ""
