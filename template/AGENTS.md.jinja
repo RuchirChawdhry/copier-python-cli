@@ -15,8 +15,8 @@ installation, other project virtual environments, or shared CI workflow reposito
 - Interpreter: Python 3.14.7 via `.python-version` and uv.
 - Dependencies: `uv sync --group dev` (commit `uv.lock`).
 - CLI: Cyclopts; terminal output: Rich; YAML: ruamel.yaml with safe loading.
-- Configuration: use `config.py`, platformdirs and persistent `config.yml`; do not create alternate settings systems.
-- Logging: initialize `LoggingConfig` in business commands; use Loguru for diagnostics and Rich for user-facing output. Keep logs off stdout and do not log secrets.
+- Configuration: use `config.py`, platformdirs and persistent `config.yml`; do not create alternate settings systems. Use root flags --init-config, --config-path, --show-config; retain set-config as a subcommand.
+- Logging: initialize `LoggingConfig` in business commands; use Loguru for diagnostics and Rich for user-facing output. Keep logs off stdout and do not log secrets. Optional synchronous @log_call in logging_utils.py traces entry, timing and failure type; native @logger.catch(reraise=True) logs exceptions. Never swallow failures; do not stack both decorators on the same function.
 - Persistence: use database.py and parameterized sqlite3 queries; keep YAML for settings, SQLite for application data.
 - Diagnostics: extend doctor.py with read-only checks; never expose secrets or create files.
 - Output: accept shared OutputOptions on every subcommand, validate via Output.guard() before side effects, emit data via Output.emit(), and use Output.progress()/track() for progress. Keep stdout machine-readable; send diagnostics and errors to stderr.

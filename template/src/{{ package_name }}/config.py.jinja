@@ -18,7 +18,7 @@ LOG_LEVELS = ("TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL
 
 
 def default_config_path() -> Path:
-    return user_config_path(APP_NAME, appauthor=False) / "config.yml"
+    return user_config_path(APP_NAME, appauthor=False, roaming=False) / "config.yml"
 
 
 def default_log_path() -> Path:

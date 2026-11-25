@@ -23,7 +23,7 @@ Commit the generated `uv.lock` for reproducible development and CI.
 
 - Installable `src/` package using uv_build and an executable Cyclopts command.
 - Rich terminal output, persistent per-user YAML settings via ruamel.yaml and platformdirs.
-- Config commands to initialize, locate, show and update settings; Loguru file and stderr logging.
+- Root configuration flags `--init-config`, `--config-path`, `--show-config` and the `set-config` subcommand; Loguru file/stderr logging with optional decorators.
 - Read-only environment diagnostics, platform-aware SQLite persistence and Rich progress reporting.
 - Shared agent-friendly flags on all application subcommands: --json, --jsonl, --quiet, --verbose, --no-color.
 - Real pytest tests for logic and CLI, Ruff formatting/lint settings, `.python-version`.

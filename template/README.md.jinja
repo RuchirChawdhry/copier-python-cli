@@ -10,7 +10,7 @@ A Python 3.14.7 command-line project using **uv**, **Cyclopts**, **Rich**, **rua
 uv sync --group dev
 uv run {{ cli_command }} --help
 uv run {{ cli_command }} hello --name developer
-uv run {{ cli_command }} show-config --path config.example.yml
+uv run {{ cli_command }} --show-config --path config.example.yml
 ```
 
 Commit the generated `uv.lock` for repeatable dependency resolution and CI runs.
@@ -18,21 +18,30 @@ Commit the generated `uv.lock` for repeatable dependency resolution and CI runs.
 ## Configuration and logging
 
 ```sh
-uv run {{ cli_command }} config-path
-uv run {{ cli_command }} init-config
-uv run {{ cli_command }} show-config
+uv run {{ cli_command }} --config-path
+uv run {{ cli_command }} --init-config
+uv run {{ cli_command }} --show-config
 uv run {{ cli_command }} set-config logging.level DEBUG
 uv run {{ cli_command }} set-config logging.verbosity 2
 uv run {{ cli_command }} hello --verbosity 1
 ```
 
 Settings live in the platform-specific user configuration directory as `config.yml`.
-On Linux this is typically `~/.config/{{ project_slug }}/config.yml`; use
-`config-path` to resolve it on any platform. Missing user settings use in-memory
-defaults. `init-config` never overwrites existing settings; `set-config` creates
+Default directories (resolved by platformdirs):
+
+| Platform | Configuration directory |
+| --- | --- |
+| Windows | `%LOCALAPPDATA%/{{ project_slug }}/` |
+| Linux | `~/.config/{{ project_slug }}/` |
+| macOS | `~/Library/Application Support/{{ project_slug }}/` |
+
+Linux respects XDG_CONFIG_HOME. Windows uses local, non-roaming storage with no
+duplicate author directory. Use `--config-path` to resolve the actual path.
+Missing user settings use in-memory defaults. `--init-config` never overwrites existing settings; `set-config` creates
 the file if necessary and accepts dotted keys and YAML values (booleans, numbers,
 strings, lists, and mappings). It preserves unrelated settings and comments.
-Use `--path` on configuration commands (except `config-path`) or `--config`
+The three root configuration flags are mutually exclusive. Use `--path` with
+`--init-config`, `--show-config` or `set-config`, or `--config`
 on the sample `hello` command to select a different file.
 
 ```yaml
@@ -49,6 +58,35 @@ Logs go to stderr and the platform-specific log directory (`app.log`), not stdou
 The example `hello` command initializes logging at command execution; use the same
 pattern in new business commands. Help and configuration commands do not create logs.
 Do not store secrets in the YAML file or write them to logs.
+
+### Optional logging decorators
+
+Configure `LoggingConfig` once before invoking decorated functions. Ordinary
+`logger.info()`, `logger.debug()` and other direct calls remain supported.
+
+```python
+from loguru import logger
+
+from .logging_utils import log_call
+
+
+@log_call
+def process_item(item: str) -> str:
+    return item.strip()
+
+
+@logger.catch(reraise=True)
+def risky_operation() -> None:
+    raise RuntimeError("Operation failed")
+```
+
+`@log_call` is for synchronous functions; it records entry and successful duration
+at DEBUG and failure type/duration at ERROR, preserves metadata and results, and
+re-raises the original exception. It never logs arguments, return values or
+exception messages automatically. Native `@logger.catch(reraise=True)` optionally
+logs an exception traceback; do not put secrets in exception messages. Avoid bare
+`@logger.catch` in CLI code because its default behavior can suppress exceptions.
+Use either decorator selectively rather than stacking them on the same function.
 
 ## Environment diagnostics
 
@@ -80,7 +118,7 @@ uv run {{ cli_command }} db-list --jsonl
 
 ## Output contract for agents
 
-Pass these shared options after any application subcommand:
+Pass these shared options after any application subcommand or alongside the root configuration flags:
 
 | Flag | Behavior |
 | --- | --- |
