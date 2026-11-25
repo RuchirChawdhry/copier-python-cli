@@ -23,7 +23,7 @@ dependencies = [
 "{{ cli_command }}" = "{{ package_name }}.cli:app"
 
 [dependency-groups]
-dev = ["pytest", "ruff"]
+dev = ["pytest", "pytest-testmon", "ruff"]
 
 [tool.uv.build-backend]
 module-name = "{{ package_name }}"
