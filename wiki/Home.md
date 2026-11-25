@@ -1,10 +1,19 @@
-# Python CLI template
+# Build CLIs for humans and agents.
 
-Build an installable, agent-friendly Python command-line application without recreating the same infrastructure in every project.
+A lean, opinionated and upgradeable Python CLI template.
 
-The template provides Python 3.14.7 and uv, Cyclopts, Rich, ruamel.yaml, platformdirs, Loguru, orjson, SQLite, pytest, Ruff, pre-commit and Go Task.
+```sh
+uvx copier copy gh:RuchirChawdhry/copier-python-cli my-cli
+```
 
-## Start here
+## Highlights
+
+- **Minimal core**: Start with essentials.
+- **Agent-ready**: Predictable interfaces.
+- **Upgradeable**: Evolve through Copier.
+- **Tested**: Verified generation.
+
+## Documentation
 
 - [Getting started](Getting-Started): generate and run a project.
 - [Architecture](Architecture): understand the reusable building blocks.
@@ -15,6 +24,12 @@ The template provides Python 3.14.7 and uv, Cyclopts, Rich, ruamel.yaml, platfor
 - [Troubleshooting](Troubleshooting): diagnose common issues.
 - [Wiki publishing](Wiki-Publishing): maintain these pages.
 
-[Source repository](https://github.com/RuchirChawdhry/copier-python-cli) · [Central workflows](https://github.com/RuchirChawdhry/ci-workflows)
+## Built with
+
+The template provides Python 3.14.7 and uv, Cyclopts, Rich, ruamel.yaml, platformdirs, Loguru, orjson, SQLite, pytest, Ruff, pre-commit and Go Task.
+
+---
+
+Python · [MIT License](https://github.com/RuchirChawdhry/copier-python-cli/blob/main/LICENSE) · [Documentation](Getting-Started) · [GitHub](https://github.com/RuchirChawdhry/copier-python-cli) · [Central workflows](https://github.com/RuchirChawdhry/ci-workflows)
 
 These pages describe the template, not a deployed application. Examples use an executable named `my-tool`.
