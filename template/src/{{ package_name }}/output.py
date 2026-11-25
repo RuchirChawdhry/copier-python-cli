@@ -1,12 +1,13 @@
 """One output contract for human users and automation."""
 
-import json
 import sqlite3
+import sys
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any
 
+import orjson
 from cyclopts import Parameter
 from rich.console import Console
 from rich.progress import Progress
@@ -46,7 +47,7 @@ class Output:
             if self.options.quiet and self.options.verbose:
                 raise ValueError("--quiet and --verbose are mutually exclusive")
             yield
-        except (OSError, ValueError, sqlite3.Error, YAMLError) as error:
+        except (OSError, ValueError, sqlite3.Error, YAMLError, orjson.JSONEncodeError) as error:
             message = (
                 "Invalid YAML configuration or value" if isinstance(error, YAMLError) else str(error)
             )
@@ -56,15 +57,24 @@ class Output:
     def emit(self, data: Any, *, human: Any = None) -> None:
         """Results only on stdout; machine output never passes through Rich."""
         if self.options.json:
-            print(json.dumps(data, ensure_ascii=True, allow_nan=False, default=str))
+            self.write_json(data)
         elif self.options.jsonl:
             records = data if isinstance(data, list) else [data]
             for record in records:
-                print(json.dumps(record, ensure_ascii=True, allow_nan=False, default=str))
+                self.write_json(record)
         elif isinstance(human, str):
             self.stdout.print(human, markup=False, highlight=False, soft_wrap=True)
         else:
             self.stdout.print(data if human is None else human)
+
+    @staticmethod
+    def write_json(data: Any) -> None:
+        """Write compact UTF-8 JSON directly, with exactly one trailing newline."""
+        payload = orjson.dumps(
+            data, default=str, option=orjson.OPT_APPEND_NEWLINE | orjson.OPT_NON_STR_KEYS
+        )
+        sys.stdout.buffer.write(payload)
+        sys.stdout.buffer.flush()
 
     def note(self, message: str) -> None:
         """Verbose-only diagnostic; never contaminates stdout."""
