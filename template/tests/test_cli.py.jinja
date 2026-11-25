@@ -7,6 +7,8 @@ from pathlib import Path
 import pytest
 from cyclopts import ValidationError
 from loguru import logger
+from ruamel.yaml import YAML
+from ruamel.yaml.error import YAMLError
 
 from {{ package_name }} import cli
 from {{ package_name }} import config as settings
@@ -281,9 +283,12 @@ def test_missing_config_error(tmp_path: Path) -> None:
     assert "Traceback" not in result.stderr
 
 
-def test_yaml_error_redacts_source(tmp_path: Path) -> None:
+def test_yaml_error_preserves_parser_diagnostics(tmp_path: Path) -> None:
     path = tmp_path / "config.yml"
-    path.write_text("secret: [sensitive-value", encoding="utf-8")
+    path.write_text("logging: [invalid-value\n", encoding="utf-8")
+    with pytest.raises(YAMLError) as error:
+        with path.open(encoding="utf-8") as stream:
+            YAML(typ="safe").load(stream)
     result = subprocess.run(
         [sys.executable, "-m", "{{ package_name }}", "--show-config", "--path", str(path)],
         capture_output=True,
@@ -292,7 +297,7 @@ def test_yaml_error_redacts_source(tmp_path: Path) -> None:
     )
     assert result.returncode == 1
     assert result.stdout == ""
-    assert result.stderr == "Error: Invalid YAML configuration or value\n"
+    assert result.stderr == f"Error: {error.value}\n"
 
 
 def test_doctor_returns_failure_status(monkeypatch, capsys) -> None:

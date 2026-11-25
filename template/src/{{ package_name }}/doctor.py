@@ -1,4 +1,4 @@
-"""Read-only runtime and environment checks; never expose configuration values."""
+"""Read-only runtime and environment checks."""
 
 import os
 import platform
@@ -57,7 +57,7 @@ def run_checks() -> Iterator[dict[str, str | bool]]:
         detail = "valid YAML" if config.exists() else "using defaults"
         yield check("config", True, f"{config}: {detail}")
     except (OSError, ValueError, TypeError, YAMLError) as error:
-        yield check("config", False, f"{config}: {type(error).__name__}")
+        yield check("config", False, f"{config}: {error}")
     yield check_path("config_path", config)
     yield check_path("logs", default_log_path())
     yield check_path("database_path", database)

@@ -140,8 +140,9 @@ uv run {{ cli_command }} doctor --json
 ```
 
 Doctor checks the Python version, OS/architecture, YAML/logging configuration, writable
-config, log and database paths, and SQLite runtime/schema. It never creates files or displays
-configuration values. The SQLite check is an on-disk snapshot, not a live WAL or integrity
+config, log and database paths, and SQLite runtime/schema. It never creates files or dumps
+the configuration; failures preserve the original exception message, including YAML parser
+context. The SQLite check is an on-disk snapshot, not a live WAL or integrity
 check. Any failed check gives exit status 1, with all results still emitted.
 
 ## Persistence
@@ -199,8 +200,8 @@ Both the installed executable and `python -m {{ package_name }}` invoke
 `cli.main()`. Raise `ApplicationError` for expected domain failures; native
 filesystem, SQLite, YAML and text-encoding exceptions are also handled there.
 Expected failures write a plain-text diagnostic to stderr and return status 1.
-YAML parser diagnostics are redacted. Cyclopts still handles argument errors and
-interrupts. Unexpected programming exceptions propagate with their traceback.
+YAML parser diagnostics are preserved, including source location and parser context.
+Cyclopts still handles argument errors and interrupts. Unexpected programming exceptions propagate with their traceback.
 Commands return integer statuses when needed (for example, doctor returns 1
 after emitting failed check results); other successful commands return status 0.
 Machine-readable success results remain on stdout; diagnostics are not JSON.

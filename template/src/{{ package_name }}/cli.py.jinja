@@ -175,8 +175,5 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         return app(argv, result_action="return_int_as_exit_code_else_zero")
     except (ApplicationError, OSError, sqlite3.Error, UnicodeError, YAMLError) as error:
-        message = (
-            "Invalid YAML configuration or value" if isinstance(error, YAMLError) else str(error)
-        )
-        print(f"Error: {message}", file=sys.stderr)
+        print(f"Error: {error}", file=sys.stderr)
         return 1
