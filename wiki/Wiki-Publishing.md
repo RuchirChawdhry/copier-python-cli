@@ -13,3 +13,7 @@ The workflow uses the built-in job token with contents: write by default. An exp
 Verify a successful run in [Actions](https://github.com/RuchirChawdhry/copier-python-cli/actions/workflows/publish-wiki.yml) and inspect the [published wiki](https://github.com/RuchirChawdhry/copier-python-cli/wiki). Repeated runs with identical sources should make no new commit.
 
 The local workflow is a thin caller of the central [wiki-publish.yml](https://github.com/RuchirChawdhry/ci-workflows/blob/main/.github/workflows/wiki-publish.yml) reusable workflow. Publishing logic and its tests live in ci-workflows. See the [central setup guide](https://github.com/RuchirChawdhry/ci-workflows/blob/main/docs/wiki-publish.md). Neither the caller nor the wiki directory is copied into generated projects.
+
+## Documentation website and AI-readable files
+
+The same source pages also build a Starlight site through the central wiki-pages workflow. Set Settings → Pages → Source to GitHub Actions before the first deployment. The website publishes HTML, a sitemap, llms.txt, llms-full.txt and individual Markdown mirrors. Edit wiki/ once; both publication workflows use it. These website files are not copied into generated applications.

@@ -1,0 +1,28 @@
+name: Documentation website
+
+on:
+  pull_request:
+    paths:
+      - 'wiki/**'
+      - '.github/workflows/publish-docs.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'wiki/**'
+      - '.github/workflows/publish-docs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: wiki-pages-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  docs:
+    uses: RuchirChawdhry/ci-workflows/.github/workflows/wiki-pages.yml@main
+    with:
+      publish: ${{ github.event_name != 'pull_request' }}
