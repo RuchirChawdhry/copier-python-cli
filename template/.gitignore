@@ -8,3 +8,6 @@ build/
 dist/
 .coverage
 .env
+.testmondata*
+.task/
+.coverage.*
