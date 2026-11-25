@@ -30,19 +30,6 @@ def test_quiet_retains_results(capsys) -> None:
     assert captured.err == ""
 
 
-@pytest.mark.parametrize(
-    "options",
-    [OutputOptions(json=True, jsonl=True), OutputOptions(quiet=True, verbose=True)],
-)
-def test_conflicting_options(options: OutputOptions, capsys) -> None:
-    with pytest.raises(SystemExit) as error, Output(options).guard():
-        pytest.fail("Conflicting flags should prevent command execution")
-    assert error.value.code == 1
-    captured = capsys.readouterr()
-    assert captured.out == ""
-    assert "mutually exclusive" in captured.err
-
-
 @pytest.mark.parametrize("options", [OutputOptions(json=True), OutputOptions(jsonl=True)])
 def test_machine_output_ignores_forced_terminal(options, monkeypatch, capsys) -> None:
     monkeypatch.setenv("FORCE_COLOR", "1")

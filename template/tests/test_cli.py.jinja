@@ -3,9 +3,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+from cyclopts import ValidationError
 from loguru import logger
 
-from {{ package_name }}.cli import hello
+from {{ package_name }} import config as settings
+from {{ package_name }}.cli import app, hello
 from {{ package_name }}.database import set_record
 
 
@@ -131,5 +134,66 @@ def test_root_conflict_does_not_write(tmp_path: Path) -> None:
     )
     assert result.returncode != 0
     assert result.stdout == ""
-    assert "mutually exclusive" in result.stderr
+    assert "Error" in result.stderr
     assert not path.exists()
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["db-list", "--json", "--jsonl"],
+        ["db-list", "--quiet", "--verbose"],
+        ["--show-config", "--init-config"],
+        ["--config-path", "--show-config"],
+        ["--config-path", "--path", "custom.yml"],
+        ["hello", "--verbosity", "4"],
+        ["hello", "--verbosity", "-1"],
+        ["--show-config", "--json", "--jsonl"],
+        ["--show-config", "--quiet", "--verbose"],
+    ],
+)
+def test_native_validation(args: list[str], monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(settings, "default_config_path", lambda: tmp_path / "config.yml")
+    with pytest.raises(ValidationError):
+        app.parse_args(args, exit_on_error=False, print_error=False)
+
+
+def test_yaml_command_defaults_and_overrides(tmp_path: Path) -> None:
+    path = tmp_path / "settings.yml"
+    path.write_text(
+        "logging:\n  file_enabled: false\n"
+        "cli:\n  hello:\n    name: Ada\n    verbosity: 1\n",
+        encoding="utf-8",
+    )
+    result = run_cli("hello", "--config", str(path), "--json")
+    assert json.loads(result.stdout) == {"message": "Hello, Ada!"}
+    assert "Greeting requested" in result.stderr
+    result = run_cli(
+        "hello", "--config", str(path), "--name", "Grace", "--verbosity", "0", "--json"
+    )
+    assert json.loads(result.stdout) == {"message": "Hello, Grace!"}
+    assert result.stderr == ""
+
+
+def test_invalid_yaml_cli_default_is_rejected(tmp_path: Path) -> None:
+    path = tmp_path / "settings.yml"
+    path.write_text("cli:\n  hello:\n    verbosity: 9\n", encoding="utf-8")
+    with pytest.raises(ValidationError):
+        app.parse_args(["hello", "--config", str(path)], exit_on_error=False, print_error=False)
+    # Config-management commands do not parse command defaults and can repair them.
+    run_cli("set-config", "cli.hello.verbosity", "1", "--path", str(path))
+    assert json.loads(run_cli("--show-config", "--path", str(path), "--json").stdout)[
+        "cli"
+    ]["hello"]["verbosity"] == 1
+
+
+def test_platform_yaml_defaults(monkeypatch, tmp_path: Path) -> None:
+    path = tmp_path / "config.yml"
+    path.write_text("cli:\n  hello:\n    name: Ada\n", encoding="utf-8")
+    monkeypatch.setattr(settings, "default_config_path", lambda: path)
+    _, bound, _ = app.parse_args(["hello", "--json", "--verbose"], exit_on_error=False)
+    assert bound.arguments["name"] == "Ada"
+    assert bound.arguments["options"].json
+    assert bound.arguments["options"].verbose
+    _, bound, _ = app.parse_args(["hello", "--name", "Grace"], exit_on_error=False)
+    assert bound.arguments["name"] == "Grace"

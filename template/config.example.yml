@@ -3,3 +3,8 @@ logging:
   level: INFO
   verbosity: 0  # 0=WARNING, 1=INFO, 2=DEBUG, 3=TRACE
   file_enabled: true
+
+# Optional defaults for command arguments; explicit CLI arguments take priority.
+cli:
+  hello:
+    name: world
