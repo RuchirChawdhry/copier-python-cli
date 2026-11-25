@@ -19,7 +19,7 @@ def test_json_and_jsonl(capsys) -> None:
 
 
 def test_quiet_retains_results(capsys) -> None:
-    output = Output(OutputOptions(quiet=True, no_color=True))
+    output = Output(OutputOptions(quiet=True))
     output.note("hidden")
     output.emit({"message": "hello"}, human="hello")
     captured = capsys.readouterr()
@@ -38,3 +38,17 @@ def test_conflicting_options(options: OutputOptions, capsys) -> None:
     captured = capsys.readouterr()
     assert captured.out == ""
     assert "mutually exclusive" in captured.err
+
+
+@pytest.mark.parametrize("options", [OutputOptions(json=True), OutputOptions(jsonl=True)])
+def test_machine_output_ignores_forced_terminal(options, monkeypatch, capsys) -> None:
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    output = Output(options)
+    assert output.stdout.color_system is None
+    assert output.stderr.color_system is None
+    assert output.progress().disable
+    output.emit({"message": "[red]literal[/red]"}, human="[red]styled[/red]")
+    captured = capsys.readouterr()
+    assert json.loads(captured.out) == {"message": "[red]literal[/red]"}
+    assert "\x1b" not in captured.out
+    assert captured.err == ""

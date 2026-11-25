@@ -39,6 +39,8 @@ def test_module_help() -> None:
     assert "db-path" in result.stdout
     assert "db-set" not in result.stdout
     assert "db-get" not in result.stdout
+    assert "--no-color" not in result.stdout
+    assert "--no-color" not in run_cli("hello", "--help").stdout
 
 
 def test_config_commands(tmp_path: Path) -> None:
@@ -54,15 +56,18 @@ def test_config_commands(tmp_path: Path) -> None:
     assert "Greeting requested" in result.stderr
 
 
-def test_machine_output(tmp_path: Path) -> None:
+def test_machine_output(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("FORCE_COLOR", "1")
     config = tmp_path / "config.yml"
     config.write_text("logging:\n  file_enabled: false\n", encoding="utf-8")
-    result = run_cli("hello", "--config", str(config), "--json", "--verbose", "--no-color")
+    result = run_cli("hello", "--config", str(config), "--json", "--verbose")
     assert json.loads(result.stdout) == {"message": "Hello, world!"}
     assert "Greeting requested" in result.stderr
+    assert "\x1b" not in result.stdout
     assert "\x1b" not in result.stderr
     result = run_cli("hello", "--config", str(config), "--jsonl", "--quiet")
     assert json.loads(result.stdout) == {"message": "Hello, world!"}
+    assert "\x1b" not in result.stdout
     assert result.stderr == ""
 
 
