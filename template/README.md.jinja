@@ -267,3 +267,18 @@ The `.copier-answers.yml` tracks the source template and your answers:
 ```sh
 uvx copier update
 ```
+
+
+## Git hooks
+
+Initialize Git before running `task setup`. Setup installs the version-controlled
+pre-commit hooks when run at the root of a Git working tree. For a project
+generated before Git initialization, run `task setup` again after `git init`.
+
+On each commit, Ruff applies safe lint fixes and formats staged Python files.
+Pre-commit protects unstaged edits, and if a hook changes a file, the commit
+stops so you can review and stage the fixes before retrying. Hooks use the same
+Ruff version and configuration as `task fix` and CI, without a second tool environment.
+
+To format all tracked Python files manually, run
+`uv run pre-commit run --all-files`.

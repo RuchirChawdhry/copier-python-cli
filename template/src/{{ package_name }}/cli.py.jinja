@@ -18,8 +18,8 @@ from rich.text import Text
 from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 
-from . import database
 from . import config as settings
+from . import database
 from .doctor import CHECK_COUNT, run_checks
 from .errors import ApplicationError
 from .output import Output, OutputOptions

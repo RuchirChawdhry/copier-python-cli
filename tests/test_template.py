@@ -58,7 +58,7 @@ def test_generated_package_metadata(generated: Path) -> None:
         any(dependency.startswith(name) for dependency in config["project"]["dependencies"])
         for name in ("cyclopts", "loguru", "orjson", "platformdirs", "rich", "ruamel.yaml")
     )
-    assert set(config["dependency-groups"]["dev"]) == {"pytest", "pytest-testmon", "ruff"}
+    assert set(config["dependency-groups"]["dev"]) == {"pre-commit", "pytest", "pytest-testmon", "ruff"}
     assert (generated / "src" / "sample_cli" / "cli.py").is_file()
     assert not (generated / ".github" / "workflows" / "template-ci.yml").exists()
     config_source = generated / "src" / "sample_cli" / "config.py"
@@ -111,7 +111,9 @@ def test_generated_taskfile(generated: Path) -> None:
         "doctor",
         "update",
     }
-    assert tasks["setup"]["cmds"] == ["uv sync --group dev"]
+    assert tasks["setup"]["cmds"][0] == "uv sync --group dev"
+    assert "uv run --no-sync pre-commit install" in tasks["setup"]["cmds"][1]
+    assert "git rev-parse --show-prefix" in tasks["setup"]["cmds"][1]
     assert tasks["dev"]["cmds"] == [
         "uv run sample-cli {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}--help{{end}}"
     ]
@@ -122,3 +124,17 @@ def test_generated_taskfile(generated: Path) -> None:
     assert "uv tool install --reinstall --python 3.14.7 ." in install
     assert "uv tool update-shell" in install
     assert "pipx ensurepath" in install
+
+
+def test_generated_pre_commit_hooks(generated: Path) -> None:
+    config = yaml.safe_load((generated / ".pre-commit-config.yaml").read_text(encoding="utf-8"))
+    assert len(config["repos"]) == 1
+    repo = config["repos"][0]
+    assert repo["repo"] == "local"
+    hooks = repo["hooks"]
+    assert [hook["id"] for hook in hooks] == ["ruff-check", "ruff-format"]
+    assert [hook["entry"] for hook in hooks] == [
+        "uv run --no-sync ruff check --fix --force-exclude",
+        "uv run --no-sync ruff format --force-exclude",
+    ]
+    assert all(hook["types"] == ["python"] for hook in hooks)

@@ -286,9 +286,8 @@ def test_missing_config_error(tmp_path: Path) -> None:
 def test_yaml_error_preserves_parser_diagnostics(tmp_path: Path) -> None:
     path = tmp_path / "config.yml"
     path.write_text("logging: [invalid-value\n", encoding="utf-8")
-    with pytest.raises(YAMLError) as error:
-        with path.open(encoding="utf-8") as stream:
-            YAML(typ="safe").load(stream)
+    with pytest.raises(YAMLError) as error, path.open(encoding="utf-8") as stream:
+        YAML(typ="safe").load(stream)
     result = subprocess.run(
         [sys.executable, "-m", "{{ package_name }}", "--show-config", "--path", str(path)],
         capture_output=True,
