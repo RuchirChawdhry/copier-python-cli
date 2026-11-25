@@ -3,7 +3,7 @@
 from io import StringIO
 from pathlib import Path
 
-from cyclopts import App
+from cyclopts import App, Parameter
 from loguru import logger
 from rich.console import Console
 from rich.table import Table
@@ -17,6 +17,7 @@ from .output import Output, OutputOptions
 
 app = App(
     name="{{ cli_command }}",
+    default_parameter=Parameter(negative=()),
     console=Console(force_terminal=False),
     error_console=Console(stderr=True, force_terminal=False),
 )
@@ -46,30 +47,48 @@ def hello(
         output.emit({"message": message}, human=message)
 
 
-@app.command
-def config_path(*, options: OutputOptions | None = None) -> None:
-    """Print the default user configuration path."""
+@app.default
+def configuration(
+    *,
+    init_config: bool = False,
+    config_path: bool = False,
+    show_config: bool = False,
+    path: Path | None = None,
+    options: OutputOptions = OutputOptions(),
+) -> None:
+    """Manage the application configuration.
+
+    Args:
+        init_config: Create default YAML settings without overwriting an existing file.
+        config_path: Print the default user configuration path.
+        show_config: Display YAML settings, or defaults if no file exists.
+        path: Override the file for --init-config or --show-config.
+        options: Shared output flags.
+    """
     output = Output(options)
     with output.guard():
-        path = str(settings.default_config_path())
-        output.emit({"path": path}, human=path)
+        count = sum((init_config, config_path, show_config))
+        if count > 1:
+            raise ValueError(
+                "--init-config, --config-path and --show-config are mutually exclusive"
+            )
+        if count == 0:
+            if path is not None or options != OutputOptions():
+                raise ValueError("Select a configuration flag or a subcommand")
+            app.help_print([])
+            return
+        if config_path:
+            if path is not None:
+                raise ValueError("--path cannot be combined with --config-path")
+            result = str(settings.default_config_path())
+            output.emit({"path": result}, human=result)
+            return
+        if init_config:
+            output.note("Initializing YAML configuration")
+            result = str(settings.init_config(path))
+            output.emit({"path": result}, human=result)
+            return
 
-
-@app.command
-def init_config(path: Path | None = None, *, options: OutputOptions | None = None) -> None:
-    """Create a default YAML configuration without overwriting settings."""
-    output = Output(options)
-    with output.guard():
-        output.note("Initializing YAML configuration")
-        result = str(settings.init_config(path))
-        output.emit({"path": result}, human=result)
-
-
-@app.command
-def show_config(path: Path | None = None, *, options: OutputOptions | None = None) -> None:
-    """Print settings; use defaults when no user configuration exists."""
-    output = Output(options)
-    with output.guard():
         output.note("Reading YAML configuration")
         config = settings.read_settings(path)
         stream = StringIO()

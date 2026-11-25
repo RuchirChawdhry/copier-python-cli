@@ -103,3 +103,15 @@ def test_logging_sinks(monkeypatch, tmp_path: Path) -> None:
         assert "warning" in output.getvalue()
     finally:
         logger.remove()
+
+
+def test_config_path_uses_local_non_roaming_directory(monkeypatch, tmp_path: Path) -> None:
+    def user_config_path(appname, *, appauthor, roaming):
+        assert appname == config.APP_NAME
+        assert appauthor is False
+        assert roaming is False
+        return tmp_path / appname
+
+    monkeypatch.setattr(config, "user_config_path", user_config_path)
+    assert config.default_config_path() == tmp_path / config.APP_NAME / "config.yml"
+    assert not config.default_config_path().exists()

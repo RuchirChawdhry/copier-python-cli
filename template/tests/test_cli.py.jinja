@@ -30,18 +30,18 @@ def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
 def test_module_help() -> None:
     result = run_cli("--help")
     assert "hello" in result.stdout
-    assert "show-config" in result.stdout
+    assert "--show-config" in result.stdout
     assert "set-config" in result.stdout
-    assert "init-config" in result.stdout
-    assert "config-path" in result.stdout
+    assert "--init-config" in result.stdout
+    assert "--config-path" in result.stdout
 
 
 def test_config_commands(tmp_path: Path) -> None:
     path = str(tmp_path / "settings.yml")
-    run_cli("init-config", "--path", path)
+    run_cli("--init-config", "--path", path)
     run_cli("set-config", "logging.verbosity", "2", "--path", path)
     run_cli("set-config", "logging.file_enabled", "false", "--path", path)
-    result = run_cli("show-config", "--path", path)
+    result = run_cli("--show-config", "--path", path)
     assert "verbosity: 2" in result.stdout
     assert "file_enabled: false" in result.stdout
     result = run_cli("hello", "--config", path, "--verbosity", "1")
@@ -91,4 +91,37 @@ def test_conflict_prevents_write(tmp_path: Path) -> None:
     )
     assert result.returncode != 0
     assert result.stdout == ""
+    assert not path.exists()
+
+
+def test_root_config_flags(tmp_path: Path) -> None:
+    path = tmp_path / "custom.yml"
+    result = run_cli("--init-config", "--path", str(path), "--json")
+    assert json.loads(result.stdout) == {"path": str(path)}
+    result = run_cli("--show-config", "--path", str(path), "--jsonl")
+    assert json.loads(result.stdout)["logging"]["verbosity"] == 0
+    result = run_cli("--config-path", "--json")
+    assert Path(json.loads(result.stdout)["path"]).name == "config.yml"
+    assert not run_cli().stderr
+
+
+def test_root_conflict_does_not_write(tmp_path: Path) -> None:
+    path = tmp_path / "custom.yml"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "{{ package_name }}",
+            "--init-config",
+            "--show-config",
+            "--path",
+            str(path),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert result.stdout == ""
+    assert "mutually exclusive" in result.stderr
     assert not path.exists()

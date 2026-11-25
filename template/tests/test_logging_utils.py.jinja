@@ -1,0 +1,58 @@
+import inspect
+from io import StringIO
+
+import pytest
+from loguru import logger
+
+from {{ package_name }}.logging_utils import log_call
+
+
+def test_log_call_preserves_result_signature_and_privacy() -> None:
+    output = StringIO()
+    sink = logger.add(output, level="DEBUG", diagnose=False)
+    try:
+        @log_call
+        def example(value: str) -> str:
+            """Return the value unchanged."""
+            return value
+
+        assert example("private-value") == "private-value"
+        assert example.__name__ == "example"
+        assert list(inspect.signature(example).parameters) == ["value"]
+        assert "Entering" in output.getvalue()
+        assert "Finished" in output.getvalue()
+        assert "private-value" not in output.getvalue()
+    finally:
+        logger.remove(sink)
+
+
+def test_log_call_preserves_failure() -> None:
+    output = StringIO()
+    sink = logger.add(output, level="ERROR", diagnose=False)
+    try:
+        @log_call
+        def fail() -> None:
+            raise ValueError("private-error")
+
+        with pytest.raises(ValueError, match="private-error"):
+            fail()
+        assert "Failed" in output.getvalue()
+        assert "ValueError" in output.getvalue()
+        assert "private-error" not in output.getvalue()
+    finally:
+        logger.remove(sink)
+
+
+def test_native_catch_reraises() -> None:
+    output = StringIO()
+    sink = logger.add(output, level="ERROR", diagnose=False, backtrace=False)
+    try:
+        @logger.catch(reraise=True)
+        def fail() -> None:
+            raise RuntimeError("native failure")
+
+        with pytest.raises(RuntimeError, match="native failure"):
+            fail()
+        assert "RuntimeError" in output.getvalue()
+    finally:
+        logger.remove(sink)
