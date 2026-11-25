@@ -189,9 +189,22 @@ integers outside its supported 64-bit range. Encoding errors return nonzero.
 
 For new commands, use the flattened `OutputOptions` parameter, initialize
 `Output(options)`, declare restrictions with Cyclopts Parameter and Group validators, use
-`output.guard()` for application failures, and return results
+the centralized `main()` error handler for application failures, and return results
 through `output.emit(data)`. For long-running operations use `output.track()`
 or `output.progress()`; both render on stderr only for interactive human output.
+
+## Application errors
+
+Both the installed executable and `python -m {{ package_name }}` invoke
+`cli.main()`. Raise `ApplicationError` for expected domain failures; native
+filesystem, SQLite, YAML and text-encoding exceptions are also handled there.
+Expected failures write a plain-text diagnostic to stderr and return status 1.
+YAML parser diagnostics are redacted. Cyclopts still handles argument errors and
+interrupts. Unexpected programming exceptions propagate with their traceback.
+Commands return integer statuses when needed (for example, doctor returns 1
+after emitting failed check results); other successful commands return status 0.
+Machine-readable success results remain on stdout; diagnostics are not JSON.
+Do not wrap each command in a separate error handler.
 
 ## Development tasks
 

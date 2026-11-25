@@ -8,6 +8,7 @@ from pathlib import Path
 from platformdirs import user_data_path
 
 from .config import APP_NAME
+from .errors import ApplicationError
 
 SCHEMA_VERSION = 1
 
@@ -40,7 +41,7 @@ def connect(path: Path | None = None) -> Iterator[sqlite3.Connection]:
                 case 1:
                     pass
                 case _:
-                    raise ValueError(f"Unsupported database schema version: {version}")
+                    raise ApplicationError(f"Unsupported database schema version: {version}")
             yield db
 
 

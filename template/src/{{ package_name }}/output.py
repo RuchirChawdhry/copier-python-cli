@@ -1,9 +1,7 @@
 """One output contract for human users and automation."""
 
-import sqlite3
 import sys
 from collections.abc import Iterable, Iterator
-from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Annotated, Any
 
@@ -11,7 +9,8 @@ import orjson
 from cyclopts import Group, Parameter, validators
 from rich.console import Console
 from rich.progress import Progress
-from ruamel.yaml.error import YAMLError
+
+from .errors import ApplicationError
 
 
 FORMAT_GROUP = Group("Output format", validator=validators.MutuallyExclusive())
@@ -42,18 +41,6 @@ class Output:
     def machine(self) -> bool:
         return self.options.json or self.options.jsonl
 
-    @contextmanager
-    def guard(self) -> Iterator[None]:
-        """Report expected application errors to stderr; Cyclopts validates CLI input."""
-        try:
-            yield
-        except (OSError, ValueError, sqlite3.Error, YAMLError, orjson.JSONEncodeError) as error:
-            message = (
-                "Invalid YAML configuration or value" if isinstance(error, YAMLError) else str(error)
-            )
-            self.stderr.print(f"Error: {message}", markup=False, highlight=False)
-            raise SystemExit(1) from None
-
     def emit(self, data: Any, *, human: Any = None) -> None:
         """Results only on stdout; machine output never passes through Rich."""
         if self.options.json:
@@ -70,9 +57,12 @@ class Output:
     @staticmethod
     def write_json(data: Any) -> None:
         """Write compact UTF-8 JSON directly, with exactly one trailing newline."""
-        payload = orjson.dumps(
-            data, default=str, option=orjson.OPT_APPEND_NEWLINE | orjson.OPT_NON_STR_KEYS
-        )
+        try:
+            payload = orjson.dumps(
+                data, default=str, option=orjson.OPT_APPEND_NEWLINE | orjson.OPT_NON_STR_KEYS
+            )
+        except orjson.JSONEncodeError as error:
+            raise ApplicationError(f"Could not serialize JSON: {error}") from error
         sys.stdout.buffer.write(payload)
         sys.stdout.buffer.flush()
 

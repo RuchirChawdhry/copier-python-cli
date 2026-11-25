@@ -12,6 +12,8 @@ from loguru import logger
 from platformdirs import user_config_path, user_log_path
 from ruamel.yaml import YAML
 
+from .errors import ApplicationError
+
 APP_NAME = "{{ project_slug }}"
 CONSOLE_LEVELS = ("WARNING", "INFO", "DEBUG", "TRACE")
 LOG_LEVELS = ("TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL")
@@ -35,21 +37,21 @@ class LoggingConfig:
 
     def __post_init__(self) -> None:
         if not isinstance(self.level, str) or self.level.upper() not in LOG_LEVELS:
-            raise ValueError(f"Logging level must be one of: {', '.join(LOG_LEVELS)}")
+            raise ApplicationError(f"Logging level must be one of: {', '.join(LOG_LEVELS)}")
         self.level = self.level.upper()
         if type(self.verbosity) is not int or self.verbosity not in range(len(CONSOLE_LEVELS)):
-            raise ValueError("Logging verbosity must be an integer from 0 to 3")
+            raise ApplicationError("Logging verbosity must be an integer from 0 to 3")
         if type(self.file_enabled) is not bool:
-            raise ValueError("logging.file_enabled must be a boolean")
+            raise ApplicationError("logging.file_enabled must be a boolean")
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> LoggingConfig:
         settings = config.get("logging", {})
         if not isinstance(settings, dict):
-            raise ValueError("logging must be a YAML mapping")
+            raise ApplicationError("logging must be a YAML mapping")
         unknown = settings.keys() - {"level", "verbosity", "file_enabled"}
         if unknown:
-            raise ValueError("Unknown logging configuration keys")
+            raise ApplicationError("Unknown logging configuration keys")
         return cls(**settings)
 
     def configure(
@@ -93,7 +95,7 @@ def load_config(path: Path) -> dict[str, Any]:
     with path.open(encoding="utf-8") as stream:
         data = yaml.load(stream)
     if not isinstance(data, dict):
-        raise ValueError("Configuration must be a YAML mapping")
+        raise ApplicationError("Configuration must be a YAML mapping")
     return data
 
 
@@ -120,7 +122,7 @@ def update_setting(key: str, value: str, path: Path | None = None) -> Path:
     path = path if path is not None else default_config_path()
     keys = key.split(".")
     if not all(keys):
-        raise ValueError("Setting key must contain non-empty dotted components")
+        raise ApplicationError("Setting key must contain non-empty dotted components")
 
     yaml = YAML()
     if path.exists():
@@ -134,7 +136,7 @@ def update_setting(key: str, value: str, path: Path | None = None) -> Path:
     for part in keys[:-1]:
         target = target.setdefault(part, {})
         if not isinstance(target, dict):
-            raise ValueError(f"Setting path crosses a non-mapping key: {part}")
+            raise ApplicationError(f"Setting path crosses a non-mapping key: {part}")
     target[keys[-1]] = YAML(typ="safe").load(value)
     LoggingConfig.from_config(config)
 

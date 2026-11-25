@@ -1,5 +1,8 @@
 """Cyclopts command definitions; keep logic in separate modules."""
 
+import sqlite3
+import sys
+from collections.abc import Sequence
 from functools import partial
 from io import StringIO
 from pathlib import Path
@@ -13,10 +16,12 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 from ruamel.yaml import YAML
+from ruamel.yaml.error import YAMLError
 
 from . import database
 from . import config as settings
 from .doctor import CHECK_COUNT, run_checks
+from .errors import ApplicationError
 from .output import Output, OutputOptions
 
 CONFIG_ACTIONS = Group("Configuration actions", validator=validators.MutuallyExclusive())
@@ -51,18 +56,17 @@ def hello(
 ) -> None:
     """Print a friendly greeting; demonstrate logging and structured results."""
     output = Output(options)
-    with output.guard():
-        logging = settings.LoggingConfig.from_config(settings.read_settings(config))
-        if output.options.verbose:
-            verbosity = max(2, logging.verbosity if verbosity is None else verbosity)
-        logging.configure(
-            verbosity,
-            quiet=output.options.quiet,
-            no_color=output.machine,
-        )
-        logger.info("Greeting requested")
-        message = f"Hello, {name}!"
-        output.emit({"message": message}, human=message)
+    logging = settings.LoggingConfig.from_config(settings.read_settings(config))
+    if output.options.verbose:
+        verbosity = max(2, logging.verbosity if verbosity is None else verbosity)
+    logging.configure(
+        verbosity,
+        quiet=output.options.quiet,
+        no_color=output.machine,
+    )
+    logger.info("Greeting requested")
+    message = f"Hello, {name}!"
+    output.emit({"message": message}, human=message)
 
 
 def _initialize_config(output: Output, path: Path | None) -> None:
@@ -104,19 +108,19 @@ def configuration(
         options: Shared output flags.
     """
     output = Output(options)
-    with output.guard():
-        actions = {
-            "init-config": (init_config, partial(_initialize_config, output, path)),
-            "config-path": (config_path, partial(_display_config_path, output)),
-            "show-config": (show_config, partial(_display_config, output, path)),
-        }
-        action = next((handler for selected, handler in actions.values() if selected), None)
-        if action is not None:
-            action()
-            return
-        if path is not None or options != OutputOptions():
-            raise ValueError("Select a configuration flag or a subcommand")
-        app.help_print([])
+    actions = {
+        "init-config": (init_config, partial(_initialize_config, output, path)),
+        "config-path": (config_path, partial(_display_config_path, output)),
+        "show-config": (show_config, partial(_display_config, output, path)),
+    }
+    action = next((handler for selected, handler in actions.values() if selected), None)
+    if action is not None:
+        action()
+        return
+    if path is not None or options != OutputOptions():
+        raise ApplicationError("Select a configuration flag or a subcommand")
+    app.help_print([])
+
 
 
 @app.command
@@ -125,47 +129,54 @@ def set_config(
 ) -> None:
     """Set a dotted configuration key to a YAML value."""
     output = Output(options)
-    with output.guard():
-        output.note(f"Updating setting: {key}")
-        result = str(settings.update_setting(key, value, path))
-        output.emit({"path": result, "key": key}, human=result)
+    output.note(f"Updating setting: {key}")
+    result = str(settings.update_setting(key, value, path))
+    output.emit({"path": result, "key": key}, human=result)
 
 
 @app.command
-def doctor(*, options: OutputOptions = OutputOptions()) -> None:
+def doctor(*, options: OutputOptions = OutputOptions()) -> int:
     """Diagnose Python, platform, configuration, paths and SQLite without writing."""
     output = Output(options)
-    with output.guard():
-        output.note("Checking runtime and local storage")
-        checks = list(output.track(run_checks(), description="Checking", total=CHECK_COUNT))
-        table = Table(title="Environment diagnostics")
-        table.add_column("Check")
-        table.add_column("Status")
-        table.add_column("Detail")
-        for check in checks:
-            table.add_row(
-                str(check["name"]),
-                "[green]OK[/green]" if check["ok"] else "[red]FAIL[/red]",
-                Text(str(check["detail"])),
-            )
-        output.emit(checks, human=table)
-        if not all(check["ok"] for check in checks):
-            raise SystemExit(1)
+    output.note("Checking runtime and local storage")
+    checks = list(output.track(run_checks(), description="Checking", total=CHECK_COUNT))
+    table = Table(title="Environment diagnostics")
+    table.add_column("Check")
+    table.add_column("Status")
+    table.add_column("Detail")
+    for check in checks:
+        table.add_row(
+            str(check["name"]),
+            "[green]OK[/green]" if check["ok"] else "[red]FAIL[/red]",
+            Text(str(check["detail"])),
+        )
+    output.emit(checks, human=table)
+    return 0 if all(check["ok"] for check in checks) else 1
 
 
 @app.command
 def db_path(*, options: OutputOptions = OutputOptions()) -> None:
     """Print the default SQLite database path without initializing it."""
     output = Output(options)
-    with output.guard():
-        path = str(database.default_database_path())
-        output.emit({"path": path}, human=path)
+    path = str(database.default_database_path())
+    output.emit({"path": path}, human=path)
 
 
 @app.command
 def db_list(*, path: File | None = None, options: OutputOptions = OutputOptions()) -> None:
     """List records in deterministic key order."""
     output = Output(options)
-    with output.guard():
-        output.note("Listing SQLite records")
-        output.emit(database.list_records(path))
+    output.note("Listing SQLite records")
+    output.emit(database.list_records(path))
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Run the CLI and handle expected application errors at its boundary."""
+    try:
+        return app(argv, result_action="return_int_as_exit_code_else_zero")
+    except (ApplicationError, OSError, sqlite3.Error, UnicodeError, YAMLError) as error:
+        message = (
+            "Invalid YAML configuration or value" if isinstance(error, YAMLError) else str(error)
+        )
+        print(f"Error: {message}", file=sys.stderr)
+        return 1

@@ -1,4 +1,5 @@
 import json
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -7,9 +8,11 @@ import pytest
 from cyclopts import ValidationError
 from loguru import logger
 
+from {{ package_name }} import cli
 from {{ package_name }} import config as settings
-from {{ package_name }}.cli import app, configuration, hello
+from {{ package_name }}.cli import app, configuration, hello, main
 from {{ package_name }}.database import set_record
+from {{ package_name }}.errors import ApplicationError
 
 
 def test_hello(capsys, tmp_path: Path) -> None:
@@ -224,39 +227,77 @@ def test_configuration_dispatches_only_selected_action(tmp_path: Path, monkeypat
 
 
 @pytest.mark.parametrize(
-    "args",
+    "error",
     [
-        ["--init-config", "--path"],
-        ["--show-config", "--path"],
-        ["set-config", "logging.verbosity", "1", "--path"],
-        ["db-list", "--path"],
+        ApplicationError("expected failure"),
+        FileNotFoundError("missing"),
+        sqlite3.OperationalError("bad database"),
     ],
 )
-def test_file_parameters_reject_directories(args: list[str], tmp_path: Path) -> None:
-    with pytest.raises(ValidationError):
-        app.parse_args([*args, str(tmp_path)], exit_on_error=False, print_error=False)
+def test_main_handles_application_errors(error: Exception, monkeypatch, capsys) -> None:
+    def fail(*args, **kwargs):
+        raise error
+
+    monkeypatch.setattr(cli, "app", fail)
+    assert main([]) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == f"Error: {error}\n"
 
 
-@pytest.mark.parametrize("suffix", [".yml", ".yaml", ".sqlite3", ""])
-@pytest.mark.parametrize("exists", [False, True])
-def test_file_parameter_accepts_existing_and_new_paths(
-    suffix: str, exists: bool, tmp_path: Path
-) -> None:
-    path = tmp_path / f"example{suffix}"
-    if exists:
-        path.touch()
-    _, bound, _ = app.parse_args(
-        ["--init-config", "--path", str(path)], exit_on_error=False, print_error=False
+@pytest.mark.parametrize("error", [ValueError("bug"), TypeError("bug"), RuntimeError("bug")])
+def test_main_does_not_swallow_programming_errors(error: Exception, monkeypatch) -> None:
+    def fail(*args, **kwargs):
+        raise error
+
+    monkeypatch.setattr(cli, "app", fail)
+    with pytest.raises(type(error), match="bug"):
+        main([])
+
+
+def test_main_preserves_command_exit_code(monkeypatch) -> None:
+    monkeypatch.setattr(cli, "app", lambda *args, **kwargs: 7)
+    assert main([]) == 7
+
+
+def test_missing_config_error(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "{{ package_name }}",
+            "--show-config",
+            "--path",
+            str(tmp_path / "missing.yml"),
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
     )
-    assert bound.arguments["path"] == path
-    assert path.exists() is exists
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert "Error:" in result.stderr
+    assert "Traceback" not in result.stderr
 
 
-def test_config_file_parameter_accepts_yml(monkeypatch, tmp_path: Path) -> None:
+def test_yaml_error_redacts_source(tmp_path: Path) -> None:
     path = tmp_path / "config.yml"
-    path.write_text("logging:\n  file_enabled: false\n", encoding="utf-8")
-    monkeypatch.setattr(settings, "default_config_path", lambda: path)
-    _, bound, _ = app.parse_args(
-        ["hello", "--config", str(path)], exit_on_error=False, print_error=False
+    path.write_text("secret: [sensitive-value", encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, "-m", "{{ package_name }}", "--show-config", "--path", str(path)],
+        capture_output=True,
+        text=True,
+        check=False,
     )
-    assert bound.arguments["config"] == path
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr == "Error: Invalid YAML configuration or value\n"
+
+
+def test_doctor_returns_failure_status(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(
+        cli, "run_checks", lambda: iter([{"name": "example", "ok": False, "detail": "failure"}])
+    )
+    assert main(["doctor", "--json"]) == 1
+    assert json.loads(capsys.readouterr().out)[0]["ok"] is False
