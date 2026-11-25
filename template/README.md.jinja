@@ -2,7 +2,7 @@
 
 {{ description }}
 
-A Python 3.14.7 command-line project using **uv**, **Cyclopts**, **Rich**, **ruamel.yaml**, **platformdirs**, **Loguru**, **Ruff**, and **pytest**.
+A Python 3.14.7 command-line project using **uv**, **Cyclopts**, **Rich**, **ruamel.yaml**, **platformdirs**, **Loguru**, **SQLite**, **Ruff**, and **pytest**.
 
 ## Start
 
@@ -49,6 +49,59 @@ Logs go to stderr and the platform-specific log directory (`app.log`), not stdou
 The example `hello` command initializes logging at command execution; use the same
 pattern in new business commands. Help and configuration commands do not create logs.
 Do not store secrets in the YAML file or write them to logs.
+
+## Environment diagnostics
+
+```sh
+uv run {{ cli_command }} doctor
+uv run {{ cli_command }} doctor --json
+```
+
+Doctor checks the Python version, OS/architecture, YAML/logging configuration, writable
+config, log and database paths, and SQLite runtime/schema. It never creates files or displays
+configuration values. The SQLite check is an on-disk snapshot, not a live WAL or integrity
+check. Any failed check gives exit status 1, with all results still emitted.
+
+## Persistence
+
+`database.py` uses Python's built-in sqlite3 with parameterized SQL, transactions,
+foreign keys, a schema version and closed connections. The default database is
+`data.sqlite3` in the platform-specific user data directory. Schema initialization
+is lazy; help, diagnostics and config commands do not initialize it.
+The starter key/value table demonstrates the persistence API; replace or extend it
+with project-specific tables and explicit schema migrations.
+
+```sh
+uv run {{ cli_command }} db-path
+uv run {{ cli_command }} db-set example value --json
+uv run {{ cli_command }} db-get example --json
+uv run {{ cli_command }} db-list --jsonl
+```
+
+## Output contract for agents
+
+Pass these shared options after any application subcommand:
+
+| Flag | Behavior |
+| --- | --- |
+| `--json` | One JSON document on stdout |
+| `--jsonl` | One record per line; a single result is one line, an empty list emits nothing |
+| `--quiet` | Suppress progress and diagnostic logging; retain results and errors |
+| `--verbose` | Enable debug logging for business commands or verbose diagnostic notes |
+| `--no-color` | Disable terminal ANSI styling |
+
+JSON/JSONL automatically disable progress and color; they are mutually exclusive.
+Quiet and verbose are mutually exclusive. Logs, progress and errors go to stderr;
+commands exit nonzero on errors. Cyclopts help and parse errors remain textual.
+The legacy numeric `hello --verbosity` option is retained. Verbose raises the
+console level to at least DEBUG; quiet suppresses console logs, not file logs.
+Machine output contains no Rich formatting; JSON is ASCII-escaped for portable
+encoding and non-JSON values such as YAML dates are stringified.
+
+For new commands, use the flattened `OutputOptions` parameter, initialize
+`Output(options)`, enter `output.guard()` before side effects, and return results
+through `output.emit(data)`. For long-running operations use `output.track()`
+or `output.progress()`; both render on stderr only for interactive human output.
 
 ## Develop
 

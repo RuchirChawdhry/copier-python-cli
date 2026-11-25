@@ -1,0 +1,21 @@
+from pathlib import Path
+
+from {{ package_name }} import doctor
+
+
+def test_doctor_is_read_only(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(doctor, "default_config_path", lambda: tmp_path / "config" / "config.yml")
+    monkeypatch.setattr(doctor, "default_log_path", lambda: tmp_path / "logs" / "app.log")
+    monkeypatch.setattr(doctor, "default_database_path", lambda: tmp_path / "db" / "data.sqlite3")
+    monkeypatch.setattr(doctor, "read_settings", lambda: {})
+    checks = list(doctor.run_checks())
+    assert len(checks) == doctor.CHECK_COUNT
+    assert all(item["ok"] for item in checks if item["name"] != "python")
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_bad_database(tmp_path: Path) -> None:
+    path = tmp_path / "data.sqlite3"
+    path.write_text("not sqlite", encoding="utf-8")
+    assert not doctor.check_database(path)["ok"]
+    assert path.read_text(encoding="utf-8") == "not sqlite"

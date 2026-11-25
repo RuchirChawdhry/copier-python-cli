@@ -52,6 +52,9 @@ def test_generated_package_metadata(generated: Path) -> None:
     assert 'APP_NAME = "sample-cli"' in config_source.read_text(encoding="utf-8")
     assert "class LoggingConfig:" in config_source.read_text(encoding="utf-8")
     assert (generated / "src" / "sample_cli" / "__main__.py").is_file()
+    for module in ("database", "doctor", "output"):
+        assert (generated / "src" / "sample_cli" / f"{module}.py").is_file()
+        assert (generated / "tests" / f"test_{module}.py").is_file()
     assert (generated / "tests" / "test_cli.py").is_file()
     assert (generated / "tests" / "test_config.py").is_file()
     assert (generated / ".python-version").read_text().strip() == "3.14.7"
