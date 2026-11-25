@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 import pytest
@@ -33,6 +34,29 @@ def test_version_and_foreign_keys(tmp_path: Path) -> None:
     with connect(path) as db:
         assert db.execute("PRAGMA user_version").fetchone()[0] == 1
         assert db.execute("PRAGMA foreign_keys").fetchone()[0] == 1
+        assert db.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
         db.execute("PRAGMA user_version = 999")
     with pytest.raises(ValueError, match="schema version"), connect(path):
         pass
+
+
+def test_wal_enabled_for_new_and_existing_databases(tmp_path: Path) -> None:
+    for filename in ("new.sqlite3", "existing.sqlite3"):
+        path = tmp_path / filename
+        if filename == "existing.sqlite3":
+            with closing(sqlite3.connect(path)) as db:
+                assert db.execute("PRAGMA journal_mode").fetchone()[0] == "delete"
+        set_record("example", "saved", path)
+        with closing(sqlite3.connect(path)) as db:
+            assert db.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+        assert get_record("example", path) == {"key": "example", "value": "saved"}
+
+
+def test_wal_reader_during_write(tmp_path: Path) -> None:
+    path = tmp_path / "data.sqlite3"
+    set_record("example", "committed", path)
+    with connect(path) as writer:
+        writer.execute("UPDATE records SET value = ? WHERE key = ?", ("pending", "example"))
+        with closing(sqlite3.connect(path, timeout=0)) as reader:
+            assert reader.execute("SELECT value FROM records").fetchone()[0] == "committed"
+    assert get_record("example", path) == {"key": "example", "value": "pending"}
