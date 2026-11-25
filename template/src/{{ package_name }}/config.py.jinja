@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sys
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
@@ -15,8 +15,6 @@ from ruamel.yaml import YAML
 from .errors import ApplicationError
 
 APP_NAME = "{{ project_slug }}"
-CONSOLE_LEVELS = ("WARNING", "INFO", "DEBUG", "TRACE")
-LOG_LEVELS = ("TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL")
 
 
 def default_config_path() -> Path:
@@ -27,20 +25,27 @@ def default_log_path() -> Path:
     return user_log_path(APP_NAME, appauthor=False) / "app.log"
 
 
+def logging_level(value: str, field: str) -> str:
+    """Validate a named level using Loguru's own level registry."""
+    if not isinstance(value, str):
+        raise ApplicationError(f"logging.{field} must be a named Loguru level")
+    try:
+        return logger.level(value.upper()).name
+    except ValueError as error:
+        raise ApplicationError(f"Invalid logging.{field}: {value}") from error
+
+
 @dataclass
 class LoggingConfig:
-    """Set file logging level and terminal verbosity independently."""
+    """Set independent named file and console logging levels."""
 
-    level: str = "INFO"
-    verbosity: int = 0
+    file_level: str = "INFO"
+    console_level: str = "WARNING"
     file_enabled: bool = True
 
     def __post_init__(self) -> None:
-        if not isinstance(self.level, str) or self.level.upper() not in LOG_LEVELS:
-            raise ApplicationError(f"Logging level must be one of: {', '.join(LOG_LEVELS)}")
-        self.level = self.level.upper()
-        if type(self.verbosity) is not int or self.verbosity not in range(len(CONSOLE_LEVELS)):
-            raise ApplicationError("Logging verbosity must be an integer from 0 to 3")
+        self.file_level = logging_level(self.file_level, "file_level")
+        self.console_level = logging_level(self.console_level, "console_level")
         if type(self.file_enabled) is not bool:
             raise ApplicationError("logging.file_enabled must be a boolean")
 
@@ -49,34 +54,33 @@ class LoggingConfig:
         settings = config.get("logging", {})
         if not isinstance(settings, dict):
             raise ApplicationError("logging must be a YAML mapping")
-        unknown = settings.keys() - {"level", "verbosity", "file_enabled"}
+        unknown = settings.keys() - {"file_level", "console_level", "file_enabled"}
         if unknown:
             raise ApplicationError("Unknown logging configuration keys")
         return cls(**settings)
 
     def configure(
         self,
-        verbosity: int | None = None,
         *,
+        verbose: bool = False,
         quiet: bool = False,
         no_color: bool = False,
     ) -> None:
         """Replace Loguru's default sink; never write logs to stdout."""
-        settings = self if verbosity is None else replace(self, verbosity=verbosity)
         logger.remove()
         if not quiet:
             logger.add(
                 sys.stderr,
-                level=CONSOLE_LEVELS[settings.verbosity],
+                level="DEBUG" if verbose else self.console_level,
                 format="<level>{level}: {message}</level>",
                 colorize=False if no_color else None,
                 backtrace=False,
                 diagnose=False,
             )
-        if settings.file_enabled:
+        if self.file_enabled:
             logger.add(
                 default_log_path(),
-                level=settings.level,
+                level=self.file_level,
                 rotation="5 MB",
                 retention="7 days",
                 encoding="utf-8",

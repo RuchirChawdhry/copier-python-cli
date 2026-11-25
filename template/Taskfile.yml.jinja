@@ -5,6 +5,10 @@ tasks:
     desc: Initialize the development environment
     cmds:
       - uv sync --group dev
+      - |
+        if git rev-parse --show-toplevel >/dev/null 2>&1 && [ -z "$(git rev-parse --show-prefix)" ]; then
+          uv run --no-sync pre-commit install
+        fi
 
   dev:
     desc: Run the application from the development environment

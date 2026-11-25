@@ -25,13 +25,25 @@ def generated(tmp_path: Path) -> Path:
             "author_name": "Example Person",
         },
         defaults=True,
+        vcs_ref="HEAD",
         unsafe=False,
     )
     return destination
 
 
-def test_template_repo_workflows_are_inert() -> None:
-    assert not (ROOT / ".github" / "workflows").exists()
+def test_template_repo_workflow_calls_central_validation_only_on_pr() -> None:
+    workflow = yaml.load(
+        (ROOT / ".github" / "workflows" / "template-ci.yml").read_text(encoding="utf-8"),
+        Loader=yaml.BaseLoader,
+    )
+    assert set(workflow["on"]) == {"pull_request"}
+    assert set(workflow["on"]["pull_request"]["types"]) == {
+        "opened", "synchronize", "reopened",
+    }
+    assert workflow["permissions"] == {"contents": "read"}
+    assert workflow["jobs"]["validate"]["uses"] == (
+        "RuchirChawdhry/ci-workflows/.github/workflows/copier-ci.yml@main"
+    )
     assert (ROOT / "template" / ".github" / "workflows" / "ci.yml.jinja").exists()
 
 
@@ -46,8 +58,9 @@ def test_generated_package_metadata(generated: Path) -> None:
         any(dependency.startswith(name) for dependency in config["project"]["dependencies"])
         for name in ("cyclopts", "loguru", "orjson", "platformdirs", "rich", "ruamel.yaml")
     )
-    assert set(config["dependency-groups"]["dev"]) == {"pytest", "pytest-testmon", "ruff"}
+    assert set(config["dependency-groups"]["dev"]) == {"pre-commit", "pytest", "pytest-testmon", "ruff"}
     assert (generated / "src" / "sample_cli" / "cli.py").is_file()
+    assert not (generated / ".github" / "workflows" / "template-ci.yml").exists()
     config_source = generated / "src" / "sample_cli" / "config.py"
     assert config_source.is_file()
     assert 'APP_NAME = "sample-cli"' in config_source.read_text(encoding="utf-8")
@@ -98,7 +111,9 @@ def test_generated_taskfile(generated: Path) -> None:
         "doctor",
         "update",
     }
-    assert tasks["setup"]["cmds"] == ["uv sync --group dev"]
+    assert tasks["setup"]["cmds"][0] == "uv sync --group dev"
+    assert "uv run --no-sync pre-commit install" in tasks["setup"]["cmds"][1]
+    assert "git rev-parse --show-prefix" in tasks["setup"]["cmds"][1]
     assert tasks["dev"]["cmds"] == [
         "uv run sample-cli {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}--help{{end}}"
     ]
@@ -109,3 +124,17 @@ def test_generated_taskfile(generated: Path) -> None:
     assert "uv tool install --reinstall --python 3.14.7 ." in install
     assert "uv tool update-shell" in install
     assert "pipx ensurepath" in install
+
+
+def test_generated_pre_commit_hooks(generated: Path) -> None:
+    config = yaml.safe_load((generated / ".pre-commit-config.yaml").read_text(encoding="utf-8"))
+    assert len(config["repos"]) == 1
+    repo = config["repos"][0]
+    assert repo["repo"] == "local"
+    hooks = repo["hooks"]
+    assert [hook["id"] for hook in hooks] == ["ruff-check", "ruff-format"]
+    assert [hook["entry"] for hook in hooks] == [
+        "uv run --no-sync ruff check --fix --force-exclude",
+        "uv run --no-sync ruff format --force-exclude",
+    ]
+    assert all(hook["types"] == ["python"] for hook in hooks)

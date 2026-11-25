@@ -1,7 +1,7 @@
-# File logging level and independent console verbosity.
+# Independent named Loguru levels for file and console logging.
 logging:
-  level: INFO
-  verbosity: 0  # 0=WARNING, 1=INFO, 2=DEBUG, 3=TRACE
+  file_level: INFO
+  console_level: WARNING
   file_enabled: true
 
 # Optional defaults for command arguments; explicit CLI arguments take priority.

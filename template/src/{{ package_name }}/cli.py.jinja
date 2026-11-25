@@ -18,8 +18,8 @@ from rich.text import Text
 from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 
-from . import database
 from . import config as settings
+from . import database
 from .doctor import CHECK_COUNT, run_checks
 from .errors import ApplicationError
 from .output import Output, OutputOptions
@@ -28,7 +28,7 @@ CONFIG_ACTIONS = Group("Configuration actions", validator=validators.MutuallyExc
 CONFIG_PATH_EXCLUSION = Group(
     "Configuration path restriction", show=False, validator=validators.MutuallyExclusive()
 )
-Verbosity = Annotated[int | None, Parameter(validator=validators.Number(gte=0, lte=3))]
+DEFAULT_OUTPUT_OPTIONS = OutputOptions()
 
 app = App(
     name="{{ cli_command }}",
@@ -51,16 +51,13 @@ def hello(
     name: str = "world",
     *,
     config: File | None = None,
-    verbosity: Verbosity = None,
-    options: OutputOptions = OutputOptions(),
+    options: OutputOptions = DEFAULT_OUTPUT_OPTIONS,
 ) -> None:
     """Print a friendly greeting; demonstrate logging and structured results."""
     output = Output(options)
     logging = settings.LoggingConfig.from_config(settings.read_settings(config))
-    if output.options.verbose:
-        verbosity = max(2, logging.verbosity if verbosity is None else verbosity)
     logging.configure(
-        verbosity,
+        verbose=output.options.verbose,
         quiet=output.options.quiet,
         no_color=output.machine,
     )
@@ -96,7 +93,7 @@ def configuration(
     config_path: Annotated[bool, Parameter(group=(CONFIG_ACTIONS, CONFIG_PATH_EXCLUSION))] = False,
     show_config: Annotated[bool, Parameter(group=CONFIG_ACTIONS)] = False,
     path: Annotated[File | None, Parameter(group=CONFIG_PATH_EXCLUSION)] = None,
-    options: OutputOptions = OutputOptions(),
+    options: OutputOptions = DEFAULT_OUTPUT_OPTIONS,
 ) -> None:
     """Manage the application configuration.
 
@@ -117,15 +114,18 @@ def configuration(
     if action is not None:
         action()
         return
-    if path is not None or options != OutputOptions():
+    if path is not None or options != DEFAULT_OUTPUT_OPTIONS:
         raise ApplicationError("Select a configuration flag or a subcommand")
     app.help_print([])
 
 
-
 @app.command
 def set_config(
-    key: str, value: str, *, path: File | None = None, options: OutputOptions = OutputOptions()
+    key: str,
+    value: str,
+    *,
+    path: File | None = None,
+    options: OutputOptions = DEFAULT_OUTPUT_OPTIONS,
 ) -> None:
     """Set a dotted configuration key to a YAML value."""
     output = Output(options)
@@ -135,7 +135,7 @@ def set_config(
 
 
 @app.command
-def doctor(*, options: OutputOptions = OutputOptions()) -> int:
+def doctor(*, options: OutputOptions = DEFAULT_OUTPUT_OPTIONS) -> int:
     """Diagnose Python, platform, configuration, paths and SQLite without writing."""
     output = Output(options)
     output.note("Checking runtime and local storage")
@@ -155,7 +155,7 @@ def doctor(*, options: OutputOptions = OutputOptions()) -> int:
 
 
 @app.command
-def db_path(*, options: OutputOptions = OutputOptions()) -> None:
+def db_path(*, options: OutputOptions = DEFAULT_OUTPUT_OPTIONS) -> None:
     """Print the default SQLite database path without initializing it."""
     output = Output(options)
     path = str(database.default_database_path())
@@ -163,7 +163,7 @@ def db_path(*, options: OutputOptions = OutputOptions()) -> None:
 
 
 @app.command
-def db_list(*, path: File | None = None, options: OutputOptions = OutputOptions()) -> None:
+def db_list(*, path: File | None = None, options: OutputOptions = DEFAULT_OUTPUT_OPTIONS) -> None:
     """List records in deterministic key order."""
     output = Output(options)
     output.note("Listing SQLite records")

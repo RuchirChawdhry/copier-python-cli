@@ -50,16 +50,16 @@ def test_init_and_update(tmp_path: Path) -> None:
     with pytest.raises(FileExistsError):
         init_config(path)
     path.write_text(path.read_text(encoding="utf-8") + "# Keep this comment\n", encoding="utf-8")
-    update_setting("logging.verbosity", "2", path)
+    update_setting("logging.console_level", "DEBUG", path)
     update_setting("application.retries", "3", path)
     update_setting("application.enabled", "true", path)
     settings = load_config(path)
-    assert settings["logging"]["verbosity"] == 2
+    assert settings["logging"]["console_level"] == "DEBUG"
     assert settings["application"] == {"retries": 3, "enabled": True}
     assert "# Keep this comment" in path.read_text(encoding="utf-8")
     original = path.read_bytes()
-    with pytest.raises(ValueError, match="verbosity"):
-        update_setting("logging.verbosity", "9", path)
+    with pytest.raises(ValueError, match="console_level"):
+        update_setting("logging.console_level", "INVALID", path)
     assert path.read_bytes() == original
 
 
@@ -72,7 +72,13 @@ def test_update_creates_missing_file(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(
     "settings",
-    [{"level": "invalid"}, {"verbosity": -1}, {"verbosity": True}, {"file_enabled": "false"}],
+    [
+        {"file_level": "invalid"},
+        {"console_level": "invalid"},
+        {"console_level": 2},
+        {"console_level": True},
+        {"file_enabled": "false"},
+    ],
 )
 def test_invalid_logging(settings: dict) -> None:
     with pytest.raises(ValueError):
@@ -85,13 +91,13 @@ def test_logging_sinks(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(config.sys, "stderr", output)
     monkeypatch.setattr(config, "default_log_path", lambda: path)
     try:
-        settings = LoggingConfig(level="INFO", verbosity=0)
-        settings.configure(verbosity=2)
+        settings = LoggingConfig(file_level="INFO", console_level="WARNING")
+        settings.configure(verbose=True)
         logger.debug("console only")
         logger.info("both sinks")
         assert "console only" in output.getvalue()
         assert "both sinks" in output.getvalue()
-        assert settings.verbosity == 0
+        assert settings.console_level == "WARNING"
         assert "both sinks" in path.read_text(encoding="utf-8")
         assert "console only" not in path.read_text(encoding="utf-8")
         output.truncate(0)
@@ -115,3 +121,43 @@ def test_config_path_uses_local_non_roaming_directory(monkeypatch, tmp_path: Pat
     monkeypatch.setattr(config, "user_config_path", user_config_path)
     assert config.default_config_path() == tmp_path / config.APP_NAME / "config.yml"
     assert not config.default_config_path().exists()
+
+
+def test_update_preserves_default_logging_levels(monkeypatch, tmp_path: Path) -> None:
+    path = tmp_path / "config.yml"
+    monkeypatch.setattr(config, "default_config_path", lambda: path)
+    init_config()
+    update_setting("logging.file_enabled", "false")
+    update_setting("cli.hello.name", "Ada")
+    settings = read_settings()
+    assert settings["logging"] == {
+        "file_level": "INFO",
+        "console_level": "WARNING",
+        "file_enabled": False,
+    }
+    assert settings["cli"]["hello"]["name"] == "Ada"
+
+
+def test_named_levels_and_console_overrides(monkeypatch, tmp_path: Path) -> None:
+    output = io.StringIO()
+    path = tmp_path / "app.log"
+    monkeypatch.setattr(config.sys, "stderr", output)
+    monkeypatch.setattr(config, "default_log_path", lambda: path)
+    settings = LoggingConfig(file_level="debug", console_level="trace")
+    assert settings.file_level == "DEBUG"
+    assert settings.console_level == "TRACE"
+    try:
+        settings.configure()
+        logger.trace("configured trace")
+        assert "configured trace" in output.getvalue()
+        settings.configure(verbose=True)
+        logger.trace("hidden trace")
+        logger.debug("verbose debug")
+        assert "hidden trace" not in output.getvalue()
+        assert "verbose debug" in output.getvalue()
+        settings.configure(quiet=True)
+        logger.error("file only")
+        assert "file only" not in output.getvalue()
+        assert "file only" in path.read_text(encoding="utf-8")
+    finally:
+        logger.remove()

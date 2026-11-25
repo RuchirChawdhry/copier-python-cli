@@ -12,7 +12,6 @@ from rich.progress import Progress
 
 from .errors import ApplicationError
 
-
 FORMAT_GROUP = Group("Output format", validator=validators.MutuallyExclusive())
 VERBOSITY_GROUP = Group("Output verbosity", validator=validators.MutuallyExclusive())
 

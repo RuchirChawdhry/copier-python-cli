@@ -48,18 +48,20 @@ def test_module_help() -> None:
     assert "db-set" not in result.stdout
     assert "db-get" not in result.stdout
     assert "--no-color" not in result.stdout
-    assert "--no-color" not in run_cli("hello", "--help").stdout
+    help_text = run_cli("hello", "--help").stdout
+    assert "--no-color" not in help_text
+    assert "--verbosity" not in help_text
 
 
 def test_config_commands(tmp_path: Path) -> None:
     path = str(tmp_path / "settings.yml")
     run_cli("--init-config", "--path", path)
-    run_cli("set-config", "logging.verbosity", "2", "--path", path)
+    run_cli("set-config", "logging.console_level", "INFO", "--path", path)
     run_cli("set-config", "logging.file_enabled", "false", "--path", path)
     result = run_cli("--show-config", "--path", path)
-    assert "verbosity: 2" in result.stdout
+    assert "console_level: INFO" in result.stdout
     assert "file_enabled: false" in result.stdout
-    result = run_cli("hello", "--config", path, "--verbosity", "1")
+    result = run_cli("hello", "--config", path)
     assert "Hello, world!" in result.stdout
     assert "Greeting requested" in result.stderr
 
@@ -115,7 +117,7 @@ def test_root_config_flags(tmp_path: Path) -> None:
     result = run_cli("--init-config", "--path", str(path), "--json")
     assert json.loads(result.stdout) == {"path": str(path)}
     result = run_cli("--show-config", "--path", str(path), "--jsonl")
-    assert json.loads(result.stdout)["logging"]["verbosity"] == 0
+    assert json.loads(result.stdout)["logging"]["console_level"] == "WARNING"
     result = run_cli("--config-path", "--json")
     assert Path(json.loads(result.stdout)["path"]).name == "config.yml"
     assert not run_cli().stderr
@@ -151,8 +153,6 @@ def test_root_conflict_does_not_write(tmp_path: Path) -> None:
         ["--show-config", "--init-config"],
         ["--config-path", "--show-config"],
         ["--config-path", "--path", "custom.yml"],
-        ["hello", "--verbosity", "4"],
-        ["hello", "--verbosity", "-1"],
         ["--show-config", "--json", "--jsonl"],
         ["--show-config", "--quiet", "--verbose"],
     ],
@@ -166,30 +166,31 @@ def test_native_validation(args: list[str], monkeypatch, tmp_path: Path) -> None
 def test_yaml_command_defaults_and_overrides(tmp_path: Path) -> None:
     path = tmp_path / "settings.yml"
     path.write_text(
-        "logging:\n  file_enabled: false\n"
-        "cli:\n  hello:\n    name: Ada\n    verbosity: 1\n",
+        "logging:\n  file_enabled: false\n  console_level: INFO\ncli:\n  hello:\n    name: Ada\n",
         encoding="utf-8",
     )
     result = run_cli("hello", "--config", str(path), "--json")
     assert json.loads(result.stdout) == {"message": "Hello, Ada!"}
     assert "Greeting requested" in result.stderr
-    result = run_cli(
-        "hello", "--config", str(path), "--name", "Grace", "--verbosity", "0", "--json"
-    )
+    result = run_cli("hello", "--config", str(path), "--name", "Grace", "--quiet", "--json")
     assert json.loads(result.stdout) == {"message": "Hello, Grace!"}
     assert result.stderr == ""
 
 
-def test_invalid_yaml_cli_default_is_rejected(tmp_path: Path) -> None:
+def test_invalid_named_logging_level_is_rejected(tmp_path: Path) -> None:
     path = tmp_path / "settings.yml"
-    path.write_text("cli:\n  hello:\n    verbosity: 9\n", encoding="utf-8")
-    with pytest.raises(ValidationError):
-        app.parse_args(["hello", "--config", str(path)], exit_on_error=False, print_error=False)
-    # Config-management commands do not parse command defaults and can repair them.
-    run_cli("set-config", "cli.hello.verbosity", "1", "--path", str(path))
-    assert json.loads(run_cli("--show-config", "--path", str(path), "--json").stdout)[
-        "cli"
-    ]["hello"]["verbosity"] == 1
+    path.write_text("logging:\n  console_level: INVALID\n", encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, "-m", "{{ package_name }}", "hello", "--config", str(path)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 1
+    assert "Invalid logging.console_level: INVALID" in result.stderr
+    run_cli("set-config", "logging.console_level", "INFO", "--path", str(path))
+    settings_data = json.loads(run_cli("--show-config", "--path", str(path), "--json").stdout)
+    assert settings_data["logging"]["console_level"] == "INFO"
 
 
 def test_platform_yaml_defaults(monkeypatch, tmp_path: Path) -> None:
@@ -286,9 +287,8 @@ def test_missing_config_error(tmp_path: Path) -> None:
 def test_yaml_error_preserves_parser_diagnostics(tmp_path: Path) -> None:
     path = tmp_path / "config.yml"
     path.write_text("logging: [invalid-value\n", encoding="utf-8")
-    with pytest.raises(YAMLError) as error:
-        with path.open(encoding="utf-8") as stream:
-            YAML(typ="safe").load(stream)
+    with pytest.raises(YAMLError) as error, path.open(encoding="utf-8") as stream:
+        YAML(typ="safe").load(stream)
     result = subprocess.run(
         [sys.executable, "-m", "{{ package_name }}", "--show-config", "--path", str(path)],
         capture_output=True,
