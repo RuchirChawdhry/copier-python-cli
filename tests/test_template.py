@@ -43,10 +43,14 @@ def test_generated_package_metadata(generated: Path) -> None:
     assert config["project"]["scripts"]["sample-cli"] == "sample_cli.cli:app"
     assert all(
         any(dependency.startswith(name) for dependency in config["project"]["dependencies"])
-        for name in ("cyclopts", "rich", "ruamel.yaml")
+        for name in ("cyclopts", "loguru", "platformdirs", "rich", "ruamel.yaml")
     )
+    assert set(config["dependency-groups"]["dev"]) == {"pytest", "ruff"}
     assert (generated / "src" / "sample_cli" / "cli.py").is_file()
-    assert (generated / "src" / "sample_cli" / "config.py").is_file()
+    config_source = generated / "src" / "sample_cli" / "config.py"
+    assert config_source.is_file()
+    assert 'APP_NAME = "sample-cli"' in config_source.read_text(encoding="utf-8")
+    assert "class LoggingConfig:" in config_source.read_text(encoding="utf-8")
     assert (generated / "src" / "sample_cli" / "__main__.py").is_file()
     assert (generated / "tests" / "test_cli.py").is_file()
     assert (generated / "tests" / "test_config.py").is_file()

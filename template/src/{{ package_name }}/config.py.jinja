@@ -1,0 +1,144 @@
+"""Persistent YAML settings and application logging."""
+
+from __future__ import annotations
+
+import sys
+from dataclasses import asdict, dataclass, replace
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+from typing import Any
+
+from loguru import logger
+from platformdirs import user_config_path, user_log_path
+from ruamel.yaml import YAML
+
+APP_NAME = "{{ project_slug }}"
+CONSOLE_LEVELS = ("WARNING", "INFO", "DEBUG", "TRACE")
+LOG_LEVELS = ("TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL")
+
+
+def default_config_path() -> Path:
+    return user_config_path(APP_NAME, appauthor=False) / "config.yml"
+
+
+def default_log_path() -> Path:
+    return user_log_path(APP_NAME, appauthor=False) / "app.log"
+
+
+@dataclass
+class LoggingConfig:
+    """Set file logging level and terminal verbosity independently."""
+
+    level: str = "INFO"
+    verbosity: int = 0
+    file_enabled: bool = True
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.level, str) or self.level.upper() not in LOG_LEVELS:
+            raise ValueError(f"Logging level must be one of: {', '.join(LOG_LEVELS)}")
+        self.level = self.level.upper()
+        if type(self.verbosity) is not int or self.verbosity not in range(len(CONSOLE_LEVELS)):
+            raise ValueError("Logging verbosity must be an integer from 0 to 3")
+        if type(self.file_enabled) is not bool:
+            raise ValueError("logging.file_enabled must be a boolean")
+
+    @classmethod
+    def from_config(cls, config: dict[str, Any]) -> LoggingConfig:
+        settings = config.get("logging", {})
+        if not isinstance(settings, dict):
+            raise ValueError("logging must be a YAML mapping")
+        return cls(**settings)
+
+    def configure(self, verbosity: int | None = None) -> None:
+        """Replace Loguru's default sink; never write logs to stdout."""
+        settings = self if verbosity is None else replace(self, verbosity=verbosity)
+        logger.remove()
+        logger.add(
+            sys.stderr,
+            level=CONSOLE_LEVELS[settings.verbosity],
+            format="<level>{level}: {message}</level>",
+            backtrace=False,
+            diagnose=False,
+        )
+        if settings.file_enabled:
+            logger.add(
+                default_log_path(),
+                level=settings.level,
+                rotation="5 MB",
+                retention="7 days",
+                encoding="utf-8",
+                backtrace=False,
+                diagnose=False,
+            )
+
+
+def default_settings() -> dict[str, Any]:
+    return {"logging": asdict(LoggingConfig())}
+
+
+def load_config(path: Path) -> dict[str, Any]:
+    """Read an existing YAML mapping without executing custom YAML tags."""
+    yaml = YAML(typ="safe")
+    with path.open(encoding="utf-8") as stream:
+        data = yaml.load(stream)
+    if not isinstance(data, dict):
+        raise ValueError("Configuration must be a YAML mapping")
+    return data
+
+
+def read_settings(path: Path | None = None) -> dict[str, Any]:
+    """Use defaults if the implicit user configuration does not exist."""
+    if path is None:
+        path = default_config_path()
+        if not path.exists():
+            return default_settings()
+    return load_config(path)
+
+
+def init_config(path: Path | None = None) -> Path:
+    """Create default settings without overwriting an existing file."""
+    path = path if path is not None else default_config_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("x", encoding="utf-8") as stream:
+        YAML().dump(default_settings(), stream)
+    return path
+
+
+def update_setting(key: str, value: str, path: Path | None = None) -> Path:
+    """Set a dotted YAML key, preserving comments and unrelated settings."""
+    path = path if path is not None else default_config_path()
+    keys = key.split(".")
+    if not all(keys):
+        raise ValueError("Setting key must contain non-empty dotted components")
+
+    yaml = YAML()
+    if path.exists():
+        load_config(path)
+        with path.open(encoding="utf-8") as stream:
+            config = yaml.load(stream)
+    else:
+        config = default_settings()
+
+    target = config
+    for part in keys[:-1]:
+        target = target.setdefault(part, {})
+        if not isinstance(target, dict):
+            raise ValueError(f"Setting path crosses a non-mapping key: {part}")
+    target[keys[-1]] = YAML(typ="safe").load(value)
+    LoggingConfig.from_config(config)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # Write to a sibling temporary file before replacing the live settings.
+    with NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent, delete=False) as stream:
+        temporary = Path(stream.name)
+        try:
+            yaml.dump(config, stream)
+        except BaseException:
+            stream.close()
+            temporary.unlink()
+            raise
+    try:
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return path

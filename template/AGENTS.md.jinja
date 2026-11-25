@@ -15,6 +15,8 @@ installation, other project virtual environments, or shared CI workflow reposito
 - Interpreter: Python 3.14.7 via `.python-version` and uv.
 - Dependencies: `uv sync --group dev` (commit `uv.lock`).
 - CLI: Cyclopts; terminal output: Rich; YAML: ruamel.yaml with safe loading.
+- Configuration: use `config.py`, platformdirs and persistent `config.yml`; do not create alternate settings systems.
+- Logging: initialize `LoggingConfig` in business commands; use Loguru for diagnostics and Rich for user-facing output. Keep logs off stdout and do not log secrets.
 - Test runner: pytest; lint/format: Ruff.
 - CI: PR-only callers of `RuchirChawdhry/ci-workflows`. Never duplicate shared workflow logic here.
 

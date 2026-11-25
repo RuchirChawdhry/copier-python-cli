@@ -1,20 +1,48 @@
 import subprocess
 import sys
+from pathlib import Path
+
+from loguru import logger
 
 from {{ package_name }}.cli import hello
 
 
-def test_hello(capsys) -> None:
-    hello("agent")
-    assert "Hello, agent!" in capsys.readouterr().out
+def test_hello(capsys, tmp_path: Path) -> None:
+    path = tmp_path / "config.yml"
+    path.write_text("logging:\n  file_enabled: false\n", encoding="utf-8")
+    try:
+        hello("agent", config=path)
+        assert "Hello, agent!" in capsys.readouterr().out
+    finally:
+        logger.remove()
 
 
-def test_module_help() -> None:
-    result = subprocess.run(
-        [sys.executable, "-m", "{{ package_name }}", "--help"],
+def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, "-m", "{{ package_name }}", *args],
         check=True,
         capture_output=True,
         text=True,
     )
+
+
+def test_module_help() -> None:
+    result = run_cli("--help")
     assert "hello" in result.stdout
     assert "show-config" in result.stdout
+    assert "set-config" in result.stdout
+    assert "init-config" in result.stdout
+    assert "config-path" in result.stdout
+
+
+def test_config_commands(tmp_path: Path) -> None:
+    path = str(tmp_path / "settings.yml")
+    run_cli("init-config", "--path", path)
+    run_cli("set-config", "logging.verbosity", "2", "--path", path)
+    run_cli("set-config", "logging.file_enabled", "false", "--path", path)
+    result = run_cli("show-config", "--path", path)
+    assert "verbosity: 2" in result.stdout
+    assert "file_enabled: false" in result.stdout
+    result = run_cli("hello", "--config", path, "--verbosity", "1")
+    assert "Hello, world!" in result.stdout
+    assert "Greeting requested" in result.stderr
