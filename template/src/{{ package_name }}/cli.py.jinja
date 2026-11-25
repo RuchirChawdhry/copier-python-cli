@@ -1,5 +1,6 @@
 """Cyclopts command definitions; keep logic in separate modules."""
 
+from functools import partial
 from io import StringIO
 from pathlib import Path
 from typing import Annotated
@@ -64,6 +65,26 @@ def hello(
         output.emit({"message": message}, human=message)
 
 
+def _initialize_config(output: Output, path: ConfigFile) -> None:
+    output.note("Initializing YAML configuration")
+    result = str(settings.init_config(path))
+    output.emit({"path": result}, human=result)
+
+
+def _display_config_path(output: Output) -> None:
+    result = str(settings.default_config_path())
+    output.emit({"path": result}, human=result)
+
+
+def _display_config(output: Output, path: ConfigFile) -> None:
+    output.note("Reading YAML configuration")
+    config = settings.read_settings(path)
+    stream = StringIO()
+    if not output.machine:
+        YAML().dump(config, stream)
+    output.emit(config, human=stream.getvalue().rstrip("\n"))
+
+
 @app.default
 def configuration(
     *,
@@ -84,28 +105,18 @@ def configuration(
     """
     output = Output(options)
     with output.guard():
-        if not (init_config or config_path or show_config):
-            if path is not None or options != OutputOptions():
-                raise ValueError("Select a configuration flag or a subcommand")
-            app.help_print([])
+        actions = {
+            "init-config": (init_config, partial(_initialize_config, output, path)),
+            "config-path": (config_path, partial(_display_config_path, output)),
+            "show-config": (show_config, partial(_display_config, output, path)),
+        }
+        action = next((handler for selected, handler in actions.values() if selected), None)
+        if action is not None:
+            action()
             return
-        if config_path:
-            result = str(settings.default_config_path())
-            output.emit({"path": result}, human=result)
-            return
-        if init_config:
-            output.note("Initializing YAML configuration")
-            result = str(settings.init_config(path))
-            output.emit({"path": result}, human=result)
-            return
-
-        output.note("Reading YAML configuration")
-        config = settings.read_settings(path)
-        stream = StringIO()
-        if not output.machine:
-            YAML().dump(config, stream)
-        output.emit(config, human=stream.getvalue().rstrip("\n"))
-
+        if path is not None or options != OutputOptions():
+            raise ValueError("Select a configuration flag or a subcommand")
+        app.help_print([])
 
 @app.command
 def set_config(
