@@ -127,9 +127,10 @@ Pass these shared options after any application subcommand or alongside the root
 | `--jsonl` | One record per line; a single result is one line, an empty list emits nothing |
 | `--quiet` | Suppress progress and diagnostic logging; retain results and errors |
 | `--verbose` | Enable debug logging for business commands or verbose diagnostic notes |
-| `--no-color` | Disable terminal ANSI styling |
 
-JSON/JSONL automatically disable progress and color; they are mutually exclusive.
+JSON/JSONL automatically disable progress and ANSI styling, including when FORCE_COLOR
+is set; they are mutually exclusive. No separate color flag is needed. Human-readable
+results use Rich's automatic terminal and color detection.
 Quiet and verbose are mutually exclusive. Logs, progress and errors go to stderr;
 commands exit nonzero on errors. Cyclopts help and parse errors remain textual.
 The legacy numeric `hello --verbosity` option is retained. Verbose raises the

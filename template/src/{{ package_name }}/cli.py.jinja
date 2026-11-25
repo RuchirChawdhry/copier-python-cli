@@ -40,7 +40,7 @@ def hello(
         logging.configure(
             verbosity,
             quiet=output.options.quiet,
-            no_color=output.options.no_color or output.machine,
+            no_color=output.machine,
         )
         logger.info("Greeting requested")
         message = f"Hello, {name}!"

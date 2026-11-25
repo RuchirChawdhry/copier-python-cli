@@ -24,16 +24,14 @@ class OutputOptions:
     """Suppress progress and diagnostic logs; retain results and errors."""
     verbose: bool = False
     """Enable debug diagnostics on stderr."""
-    no_color: bool = False
-    """Disable ANSI styling."""
 
 
 class Output:
     def __init__(self, options: OutputOptions | None = None) -> None:
         self.options = options or OutputOptions()
-        plain = self.options.no_color or self.machine
-        self.stdout = Console(force_terminal=False if plain else None)
-        self.stderr = Console(stderr=True, force_terminal=False if plain else None)
+        console_options = {"force_terminal": False, "color_system": None} if self.machine else {}
+        self.stdout = Console(**console_options)
+        self.stderr = Console(stderr=True, **console_options)
 
     @property
     def machine(self) -> bool:
