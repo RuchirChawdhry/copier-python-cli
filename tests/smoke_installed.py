@@ -22,7 +22,9 @@ def test_installed_configuration_and_greeting(tmp_path):
         "path": str(config)
     }
     assert config.is_file()
-    run_cli("set-config", "logging.file_enabled", "false", "--path", str(config))
+    assert run_cli("set-config", "logging.file_enabled", "false", "--path", str(config), "--json") == {
+        "path": str(config), "key": "logging.file_enabled"
+    }
     assert run_cli("--show-config", "--path", str(config), "--json")["logging"][
         "file_enabled"
     ] is False
