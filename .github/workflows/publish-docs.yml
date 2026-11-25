@@ -4,11 +4,13 @@ on:
   pull_request:
     paths:
       - 'wiki/**'
+      - 'schema.json'
       - '.github/workflows/publish-docs.yml'
   push:
     branches: [main]
     paths:
       - 'wiki/**'
+      - 'schema.json'
       - '.github/workflows/publish-docs.yml'
   workflow_dispatch:
 
