@@ -1,0 +1,16 @@
+name: Template CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: template-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    uses: RuchirChawdhry/ci-workflows/.github/workflows/copier-ci.yml@main

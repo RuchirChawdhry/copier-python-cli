@@ -32,13 +32,19 @@ Commit the generated `uv.lock` for reproducible development and CI.
 - PR-only GitHub Actions callers for the central **python-cli** and **python-build** workflows.
 - MIT license, `.gitignore`, Copier answers for future `copier update`.
 
-## Why the template repo never runs these workflows
+## Continuous integration
 
-The workflow source lives in `template/.github/workflows/ci.yml.jinja`, **not**
-`.github/workflows/` at this repository's root. GitHub only detects workflows in the
-root `.github/workflows/`, so nothing is activated here. Copier emits the normal
-`.github/workflows/ci.yml` only into generated projects. Generated workflows run on
-**pull requests only**, never `push`, `schedule`, or manual dispatch.
+This repository has a root workflow, `.github/workflows/template-ci.yml`,
+which calls the central [Copier validation workflow](https://github.com/RuchirChawdhry/ci-workflows/blob/main/.github/workflows/copier-ci.yml).
+It runs when a pull request is opened, updated or reopened. It tests the template
+contracts, renders the current revision, runs Ruff and pytest on the generated
+project, builds and checks distributions, and installs the wheel for a CLI help
+smoke test on Ubuntu 24.04. New commits cancel older runs for the same PR.
+
+The generated application's independent workflow lives under
+`template/.github/workflows/ci.yml.jinja`. Copier renders it into the generated
+project; it is not run in this template repository. Generated workflows remain
+PR-only.
 
 The CI jobs reference:
 
@@ -51,12 +57,12 @@ reproducibility is required; the user-managed central workflows remain the sourc
 ## Test this template itself
 
 ```sh
-uv run --no-project --with copier --with pytest pytest tests -q
+uv run --no-project --with copier==9.14.1 --with pytest --with PyYAML pytest tests -q
 ```
 
 The tests generate a sample application and assert package metadata, imports,
-Copier update context, and isolated PR-only workflow placement. No GitHub Actions
-workflows are registered in this template repository.
+Copier update context, and separation of the template-validation and generated-project
+PR-only workflows.
 
 ## Philosophy
 
