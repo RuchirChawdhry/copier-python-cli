@@ -2,7 +2,7 @@
 
 {{ description }}
 
-A Python 3.14.7 command-line project using **uv**, **Cyclopts**, **Rich**, **ruamel.yaml**, **platformdirs**, **Loguru**, **SQLite**, **Ruff**, and **pytest**.
+A Python 3.14.7 command-line project using **uv**, **Cyclopts**, **Rich**, **ruamel.yaml**, **platformdirs**, **Loguru**, **orjson**, **SQLite**, **Ruff**, and **pytest**.
 
 ## Start
 
@@ -135,8 +135,11 @@ Quiet and verbose are mutually exclusive. Logs, progress and errors go to stderr
 commands exit nonzero on errors. Cyclopts help and parse errors remain textual.
 The legacy numeric `hello --verbosity` option is retained. Verbose raises the
 console level to at least DEBUG; quiet suppresses console logs, not file logs.
-Machine output contains no Rich formatting; JSON is ASCII-escaped for portable
-encoding and non-JSON values such as YAML dates are stringified.
+Machine output contains no Rich formatting. Both formats use orjson to write compact
+UTF-8 bytes directly to stdout, with one newline per document or record. Dates use
+ISO 8601, unsupported object values fall back to str, and supported non-string keys
+are converted to strings. orjson represents non-finite floats as null and rejects
+integers outside its supported 64-bit range. Encoding errors return nonzero.
 
 For new commands, use the flattened `OutputOptions` parameter, initialize
 `Output(options)`, enter `output.guard()` before side effects, and return results
