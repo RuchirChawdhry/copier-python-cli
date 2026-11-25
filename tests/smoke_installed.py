@@ -67,11 +67,18 @@ def test_installed_configuration(run_cli, tmp_path):
     assert path.read_bytes() == original
 
     run_cli("set-config", "logging.file_enabled", "false", "--json")
+    run_cli("set-config", "logging.console_level", "INFO", "--json")
     run_cli("set-config", "cli.hello.name", "Ada", "--json")
     settings = json.loads(run_cli("--show-config", "--json").stdout)
-    assert settings["logging"]["file_enabled"] is False
+    assert settings["logging"] == {
+        "file_level": "INFO",
+        "console_level": "INFO",
+        "file_enabled": False,
+    }
     assert settings["cli"]["hello"]["name"] == "Ada"
-    assert json.loads(run_cli("hello", "--json").stdout) == {"message": "Hello, Ada!"}
+    result = run_cli("hello", "--json")
+    assert json.loads(result.stdout) == {"message": "Hello, Ada!"}
+    assert "Greeting requested" in result.stderr
     assert json.loads(run_cli("hello", "--name", "Grace", "--json").stdout) == {
         "message": "Hello, Grace!"
     }

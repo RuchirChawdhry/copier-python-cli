@@ -21,9 +21,9 @@ Commit the generated `uv.lock` for repeatable dependency resolution and CI runs.
 uv run {{ cli_command }} --config-path
 uv run {{ cli_command }} --init-config
 uv run {{ cli_command }} --show-config
-uv run {{ cli_command }} set-config logging.level DEBUG
-uv run {{ cli_command }} set-config logging.verbosity 2
-uv run {{ cli_command }} hello --verbosity 1
+uv run {{ cli_command }} set-config logging.file_level DEBUG
+uv run {{ cli_command }} set-config logging.console_level DEBUG
+uv run {{ cli_command }} hello --verbose
 ```
 
 Settings live in the platform-specific user configuration directory as `config.yml`.
@@ -46,13 +46,13 @@ on the sample `hello` command to select a different file.
 
 ```yaml
 logging:
-  level: INFO
-  verbosity: 0
+  file_level: INFO
+  console_level: WARNING
   file_enabled: true
 ```
 
-`LoggingConfig` in `config.py` controls logging. Console verbosity is 0=WARNING,
-1=INFO, 2=DEBUG, 3=TRACE. The file level is independent. File logs rotate at 5 MB
+`LoggingConfig` in `config.py` validates named levels using Loguru. The console
+and file levels are independent. File logs rotate at 5 MB
 and old logs are retained for 7 days; disable file logging with `file_enabled: false`.
 Logs go to stderr and the platform-specific log directory (`app.log`), not stdout.
 The example `hello` command initializes logging at command execution; use the same
@@ -69,8 +69,7 @@ both `.yml` and `.yaml` as well as SQLite filenames.
 Use `ExistingFile` or `ExistingDirectory` when the target must already exist,
 `NonExistentFile` for a new output target, `Directory` for a directory that may
 need creation, and `PositiveInt`, `NonNegativeInt` or `Port` for matching numeric
-constraints. Use custom validators only for project-specific restrictions, such
-as logging verbosity from 0 through 3.
+constraints. Use custom validators only for project-specific restrictions.
 
 See [Cyclopts types](https://cyclopts.readthedocs.io/en/stable/types.html).
 
@@ -83,7 +82,6 @@ defaults in the same YAML file, under the `cli` namespace:
 cli:
   hello:
     name: Ada
-    verbosity: 1
 ```
 
 ```sh
@@ -177,11 +175,11 @@ JSON/JSONL automatically disable progress and ANSI styling, including when FORCE
 is set; they are mutually exclusive. No separate color flag is needed. Human-readable
 results use Rich's automatic terminal and color detection.
 Quiet and verbose are mutually exclusive. Cyclopts group validators reject conflicting
-flags before command execution, and its numeric validator constrains CLI verbosity.
+flags before command execution.
 Logs, progress and errors go to stderr;
 commands exit nonzero on errors. Cyclopts help and parse errors remain textual.
-The legacy numeric `hello --verbosity` option is retained. Verbose raises the
-console level to at least DEBUG; quiet suppresses console logs, not file logs.
+Verbose selects DEBUG for the console; quiet suppresses console logs, not file logs.
+For TRACE or another named level, set `logging.console_level` in YAML.
 Machine output contains no Rich formatting. Both formats use orjson to write compact
 UTF-8 bytes directly to stdout, with one newline per document or record. Dates use
 ISO 8601, unsupported object values fall back to str, and supported non-string keys
@@ -262,7 +260,12 @@ It runs for pull requests, not pushes or schedules. No PyPI publishing is enable
 
 ## Updating from the Copier template
 
-The `.copier-answers.yml` tracks the source template and your answers:
+The `.copier-answers.yml` tracks the source template and your answers.
+If updating an older generated project, migrate the user configuration: rename
+`logging.level` to `logging.file_level`, replace `logging.verbosity` with
+`logging.console_level` (0=WARNING, 1=INFO, 2=DEBUG, 3=TRACE), and remove any
+numeric `verbosity` defaults under `cli`. No automatic configuration migration is performed.
+
 
 ```sh
 uvx copier update

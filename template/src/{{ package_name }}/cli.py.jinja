@@ -28,7 +28,6 @@ CONFIG_ACTIONS = Group("Configuration actions", validator=validators.MutuallyExc
 CONFIG_PATH_EXCLUSION = Group(
     "Configuration path restriction", show=False, validator=validators.MutuallyExclusive()
 )
-Verbosity = Annotated[int | None, Parameter(validator=validators.Number(gte=0, lte=3))]
 DEFAULT_OUTPUT_OPTIONS = OutputOptions()
 
 app = App(
@@ -52,16 +51,13 @@ def hello(
     name: str = "world",
     *,
     config: File | None = None,
-    verbosity: Verbosity = None,
     options: OutputOptions = DEFAULT_OUTPUT_OPTIONS,
 ) -> None:
     """Print a friendly greeting; demonstrate logging and structured results."""
     output = Output(options)
     logging = settings.LoggingConfig.from_config(settings.read_settings(config))
-    if output.options.verbose:
-        verbosity = max(2, logging.verbosity if verbosity is None else verbosity)
     logging.configure(
-        verbosity,
+        verbose=output.options.verbose,
         quiet=output.options.quiet,
         no_color=output.machine,
     )
