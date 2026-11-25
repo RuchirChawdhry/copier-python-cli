@@ -1,0 +1,40 @@
+import json
+
+import pytest
+
+from {{ package_name }}.output import Output, OutputOptions
+
+
+def test_json_and_jsonl(capsys) -> None:
+    records = [{"id": 1}, {"id": 2}]
+    Output(OutputOptions(json=True)).emit(records)
+    assert json.loads(capsys.readouterr().out) == records
+    output = Output(OutputOptions(jsonl=True, verbose=True))
+    assert list(output.track(records, total=2)) == records
+    output.note("diagnostic")
+    output.emit(records)
+    captured = capsys.readouterr()
+    assert [json.loads(line) for line in captured.out.splitlines()] == records
+    assert captured.err.strip() == "diagnostic"
+
+
+def test_quiet_retains_results(capsys) -> None:
+    output = Output(OutputOptions(quiet=True, no_color=True))
+    output.note("hidden")
+    output.emit({"message": "hello"}, human="hello")
+    captured = capsys.readouterr()
+    assert captured.out == "hello\n"
+    assert captured.err == ""
+
+
+@pytest.mark.parametrize(
+    "options",
+    [OutputOptions(json=True, jsonl=True), OutputOptions(quiet=True, verbose=True)],
+)
+def test_conflicting_options(options: OutputOptions, capsys) -> None:
+    with pytest.raises(SystemExit) as error, Output(options).guard():
+        pytest.fail("Conflicting flags should prevent command execution")
+    assert error.value.code == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "mutually exclusive" in captured.err

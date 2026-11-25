@@ -47,19 +47,30 @@ class LoggingConfig:
         settings = config.get("logging", {})
         if not isinstance(settings, dict):
             raise ValueError("logging must be a YAML mapping")
+        unknown = settings.keys() - {"level", "verbosity", "file_enabled"}
+        if unknown:
+            raise ValueError("Unknown logging configuration keys")
         return cls(**settings)
 
-    def configure(self, verbosity: int | None = None) -> None:
+    def configure(
+        self,
+        verbosity: int | None = None,
+        *,
+        quiet: bool = False,
+        no_color: bool = False,
+    ) -> None:
         """Replace Loguru's default sink; never write logs to stdout."""
         settings = self if verbosity is None else replace(self, verbosity=verbosity)
         logger.remove()
-        logger.add(
-            sys.stderr,
-            level=CONSOLE_LEVELS[settings.verbosity],
-            format="<level>{level}: {message}</level>",
-            backtrace=False,
-            diagnose=False,
-        )
+        if not quiet:
+            logger.add(
+                sys.stderr,
+                level=CONSOLE_LEVELS[settings.verbosity],
+                format="<level>{level}: {message}</level>",
+                colorize=False if no_color else None,
+                backtrace=False,
+                diagnose=False,
+            )
         if settings.file_enabled:
             logger.add(
                 default_log_path(),

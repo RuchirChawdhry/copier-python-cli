@@ -1,3 +1,4 @@
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -46,3 +47,48 @@ def test_config_commands(tmp_path: Path) -> None:
     result = run_cli("hello", "--config", path, "--verbosity", "1")
     assert "Hello, world!" in result.stdout
     assert "Greeting requested" in result.stderr
+
+
+def test_machine_output(tmp_path: Path) -> None:
+    config = tmp_path / "config.yml"
+    config.write_text("logging:\n  file_enabled: false\n", encoding="utf-8")
+    result = run_cli("hello", "--config", str(config), "--json", "--verbose", "--no-color")
+    assert json.loads(result.stdout) == {"message": "Hello, world!"}
+    assert "Greeting requested" in result.stderr
+    assert "\x1b" not in result.stderr
+    result = run_cli("hello", "--config", str(config), "--jsonl", "--quiet")
+    assert json.loads(result.stdout) == {"message": "Hello, world!"}
+    assert result.stderr == ""
+
+
+def test_db_commands(tmp_path: Path) -> None:
+    path = str(tmp_path / "db.sqlite3")
+    run_cli("db-set", "b", "two", "--path", path, "--json")
+    run_cli("db-set", "a", "one", "--path", path, "--json")
+    result = run_cli("db-list", "--path", path, "--jsonl")
+    assert [json.loads(line)["key"] for line in result.stdout.splitlines()] == ["a", "b"]
+    assert json.loads(run_cli("db-get", "b", "--path", path, "--json").stdout)["value"] == "two"
+
+
+def test_conflict_prevents_write(tmp_path: Path) -> None:
+    path = tmp_path / "db.sqlite3"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "{{ package_name }}",
+            "db-set",
+            "key",
+            "value",
+            "--path",
+            str(path),
+            "--json",
+            "--jsonl",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert result.stdout == ""
+    assert not path.exists()

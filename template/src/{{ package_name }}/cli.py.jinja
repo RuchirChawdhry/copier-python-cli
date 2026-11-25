@@ -1,16 +1,25 @@
-"""Cyclopts command definitions; put business logic in separate modules."""
+"""Cyclopts command definitions; keep logic in separate modules."""
 
-import sys
+from io import StringIO
 from pathlib import Path
 
 from cyclopts import App
 from loguru import logger
 from rich.console import Console
+from rich.table import Table
+from rich.text import Text
 from ruamel.yaml import YAML
 
+from . import database
 from . import config as settings
+from .doctor import CHECK_COUNT, run_checks
+from .output import Output, OutputOptions
 
-app = App(name="{{ cli_command }}")
+app = App(
+    name="{{ cli_command }}",
+    console=Console(force_terminal=False),
+    error_console=Console(stderr=True, force_terminal=False),
+)
 
 
 @app.command
@@ -19,38 +28,128 @@ def hello(
     *,
     config: Path | None = None,
     verbosity: int | None = None,
+    options: OutputOptions | None = None,
 ) -> None:
-    """Print a friendly greeting.
-
-    Args:
-        name: Name to greet.
-        config: Override the user configuration file.
-        verbosity: Override console verbosity (0 to 3) for this invocation.
-    """
-    settings.LoggingConfig.from_config(settings.read_settings(config)).configure(verbosity)
-    logger.info("Greeting requested")
-    Console().print(f"Hello, {name}!")
+    """Print a friendly greeting; demonstrate logging and structured results."""
+    output = Output(options)
+    with output.guard():
+        logging = settings.LoggingConfig.from_config(settings.read_settings(config))
+        if output.options.verbose:
+            verbosity = max(2, logging.verbosity if verbosity is None else verbosity)
+        logging.configure(
+            verbosity,
+            quiet=output.options.quiet,
+            no_color=output.options.no_color or output.machine,
+        )
+        logger.info("Greeting requested")
+        message = f"Hello, {name}!"
+        output.emit({"message": message}, human=message)
 
 
 @app.command
-def config_path() -> None:
+def config_path(*, options: OutputOptions | None = None) -> None:
     """Print the default user configuration path."""
-    print(settings.default_config_path())
+    output = Output(options)
+    with output.guard():
+        path = str(settings.default_config_path())
+        output.emit({"path": path}, human=path)
 
 
 @app.command
-def init_config(path: Path | None = None) -> None:
+def init_config(path: Path | None = None, *, options: OutputOptions | None = None) -> None:
     """Create a default YAML configuration without overwriting settings."""
-    print(settings.init_config(path))
+    output = Output(options)
+    with output.guard():
+        output.note("Initializing YAML configuration")
+        result = str(settings.init_config(path))
+        output.emit({"path": result}, human=result)
 
 
 @app.command
-def show_config(path: Path | None = None) -> None:
-    """Print YAML settings; use defaults when no user config exists."""
-    YAML().dump(settings.read_settings(path), sys.stdout)
+def show_config(path: Path | None = None, *, options: OutputOptions | None = None) -> None:
+    """Print settings; use defaults when no user configuration exists."""
+    output = Output(options)
+    with output.guard():
+        output.note("Reading YAML configuration")
+        config = settings.read_settings(path)
+        stream = StringIO()
+        if not output.machine:
+            YAML().dump(config, stream)
+        output.emit(config, human=stream.getvalue().rstrip("\n"))
 
 
 @app.command
-def set_config(key: str, value: str, *, path: Path | None = None) -> None:
+def set_config(
+    key: str, value: str, *, path: Path | None = None, options: OutputOptions | None = None
+) -> None:
     """Set a dotted configuration key to a YAML value."""
-    print(settings.update_setting(key, value, path))
+    output = Output(options)
+    with output.guard():
+        output.note(f"Updating setting: {key}")
+        result = str(settings.update_setting(key, value, path))
+        output.emit({"path": result, "key": key}, human=result)
+
+
+@app.command
+def doctor(*, options: OutputOptions | None = None) -> None:
+    """Diagnose Python, platform, configuration, paths and SQLite without writing."""
+    output = Output(options)
+    with output.guard():
+        output.note("Checking runtime and local storage")
+        checks = list(output.track(run_checks(), description="Checking", total=CHECK_COUNT))
+        table = Table(title="Environment diagnostics")
+        table.add_column("Check")
+        table.add_column("Status")
+        table.add_column("Detail")
+        for check in checks:
+            table.add_row(
+                str(check["name"]),
+                "[green]OK[/green]" if check["ok"] else "[red]FAIL[/red]",
+                Text(str(check["detail"])),
+            )
+        output.emit(checks, human=table)
+        if not all(check["ok"] for check in checks):
+            raise SystemExit(1)
+
+
+@app.command
+def db_path(*, options: OutputOptions | None = None) -> None:
+    """Print the default SQLite database path without initializing it."""
+    output = Output(options)
+    with output.guard():
+        path = str(database.default_database_path())
+        output.emit({"path": path}, human=path)
+
+
+@app.command
+def db_set(
+    key: str, value: str, *, path: Path | None = None, options: OutputOptions | None = None
+) -> None:
+    """Insert or update a record in the local SQLite database."""
+    output = Output(options)
+    with output.guard():
+        output.note("Writing SQLite record")
+        output.emit(database.set_record(key, value, path))
+
+
+@app.command
+def db_get(
+    key: str, *, path: Path | None = None, options: OutputOptions | None = None
+) -> None:
+    """Retrieve a record by key."""
+    output = Output(options)
+    with output.guard():
+        output.note("Reading SQLite record")
+        record = database.get_record(key, path)
+        if record is None:
+            raise ValueError("Record not found")
+        output.emit(record)
+
+
+@app.command
+def db_list(*, path: Path | None = None, options: OutputOptions | None = None) -> None:
+    """List records in deterministic key order."""
+    output = Output(options)
+    with output.guard():
+        output.note("Listing SQLite records")
+        output.emit(database.list_records(path))

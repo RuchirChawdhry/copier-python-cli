@@ -1,0 +1,38 @@
+import sqlite3
+from pathlib import Path
+
+import pytest
+
+from {{ package_name }}.database import connect, get_record, list_records, set_record
+
+
+def test_persistence(tmp_path: Path) -> None:
+    path = tmp_path / "nested" / "data.sqlite3"
+    set_record("b", "first", path)
+    set_record("a", "'; DROP TABLE records; --", path)
+    set_record("b", "second", path)
+    assert get_record("b", path) == {"key": "b", "value": "second"}
+    assert get_record("missing", path) is None
+    assert [row["key"] for row in list_records(path)] == ["a", "b"]
+
+
+def test_transaction_and_close(tmp_path: Path) -> None:
+    path = tmp_path / "data.sqlite3"
+    set_record("before", "saved", path)
+    with pytest.raises(RuntimeError, match="rollback"), connect(path) as db:
+        db.execute("INSERT INTO records VALUES (?, ?)", ("temporary", "discard"))
+        raise RuntimeError("rollback")
+    assert get_record("temporary", path) is None
+    assert get_record("before", path) is not None
+    with pytest.raises(sqlite3.ProgrammingError, match="closed"):
+        db.execute("SELECT 1")
+
+
+def test_version_and_foreign_keys(tmp_path: Path) -> None:
+    path = tmp_path / "data.sqlite3"
+    with connect(path) as db:
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 1
+        assert db.execute("PRAGMA foreign_keys").fetchone()[0] == 1
+        db.execute("PRAGMA user_version = 999")
+    with pytest.raises(ValueError, match="schema version"), connect(path):
+        pass
