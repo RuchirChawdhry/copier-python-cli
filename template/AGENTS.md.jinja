@@ -14,12 +14,12 @@ installation, other project virtual environments, or shared CI workflow reposito
 
 - Interpreter: Python 3.14.7 via `.python-version` and uv.
 - Dependencies: `uv sync --group dev` (commit `uv.lock`).
-- CLI: Cyclopts; terminal output: Rich; YAML: ruamel.yaml with safe loading.
-- Configuration: use `config.py`, platformdirs and persistent `config.yml`; do not create alternate settings systems. Use root flags --init-config, --config-path, --show-config; retain set-config as a subcommand.
+- CLI: Cyclopts; declare argument constraints with native Parameter/Group validators; do not duplicate CLI validation in command bodies. Terminal output: Rich; YAML: ruamel.yaml with safe loading.
+- Configuration: use `config.py`, platformdirs and persistent `config.yml`; do not create alternate settings systems. Use native Cyclopts Yaml loading for argument defaults under cli.<command>; do not merge arguments manually. Use root flags --init-config, --config-path, --show-config; retain set-config as a subcommand.
 - Logging: initialize `LoggingConfig` in business commands; use Loguru for diagnostics and Rich for user-facing output. Keep logs off stdout and do not log secrets. Optional synchronous @log_call in logging_utils.py traces entry, timing and failure type; native @logger.catch(reraise=True) logs exceptions. Never swallow failures; do not stack both decorators on the same function.
 - Persistence: use database.py and parameterized sqlite3 queries with WAL enabled by default; expose project-specific commands rather than generic database setters/getters. Keep YAML for settings, SQLite for application data.
 - Diagnostics: extend doctor.py with read-only checks; never expose secrets or create files.
-- Output: accept shared OutputOptions on every subcommand, validate via Output.guard() before side effects, emit data via Output.emit(), and use Output.progress()/track() for progress. Keep stdout machine-readable; JSON/JSONL use orjson exclusively for serialization and automatically disable color and progress. Do not introduce parallel JSON output implementations. Do not add redundant color flags. Send diagnostics and errors to stderr.
+- Output: accept shared OutputOptions on every subcommand, use native Cyclopts validators for flags and Output.guard() for application errors, emit data via Output.emit(), and use Output.progress()/track() for progress. Keep stdout machine-readable; JSON/JSONL use orjson exclusively for serialization and automatically disable color and progress. Do not introduce parallel JSON output implementations. Do not add redundant color flags. Send diagnostics and errors to stderr.
 - Test runner: pytest; lint/format: Ruff.
 - CI: PR-only callers of `RuchirChawdhry/ci-workflows`. Never duplicate shared workflow logic here.
 

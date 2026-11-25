@@ -5,25 +5,29 @@ import sys
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any
+from typing import Annotated, Any
 
 import orjson
-from cyclopts import Parameter
+from cyclopts import Group, Parameter, validators
 from rich.console import Console
 from rich.progress import Progress
 from ruamel.yaml.error import YAMLError
 
 
+FORMAT_GROUP = Group("Output format", validator=validators.MutuallyExclusive())
+VERBOSITY_GROUP = Group("Output verbosity", validator=validators.MutuallyExclusive())
+
+
 @Parameter(name="*", negative=())
 @dataclass(frozen=True)
 class OutputOptions:
-    json: bool = False
+    json: Annotated[bool, Parameter(group=FORMAT_GROUP)] = False
     """Emit one JSON document."""
-    jsonl: bool = False
+    jsonl: Annotated[bool, Parameter(group=FORMAT_GROUP)] = False
     """Emit one JSON record per line."""
-    quiet: bool = False
+    quiet: Annotated[bool, Parameter(group=VERBOSITY_GROUP)] = False
     """Suppress progress and diagnostic logs; retain results and errors."""
-    verbose: bool = False
+    verbose: Annotated[bool, Parameter(group=VERBOSITY_GROUP)] = False
     """Enable debug diagnostics on stderr."""
 
 
@@ -40,12 +44,8 @@ class Output:
 
     @contextmanager
     def guard(self) -> Iterator[None]:
-        """Validate common flags before side effects; report expected errors to stderr."""
+        """Report expected application errors to stderr; Cyclopts validates CLI input."""
         try:
-            if self.options.json and self.options.jsonl:
-                raise ValueError("--json and --jsonl are mutually exclusive")
-            if self.options.quiet and self.options.verbose:
-                raise ValueError("--quiet and --verbose are mutually exclusive")
             yield
         except (OSError, ValueError, sqlite3.Error, YAMLError, orjson.JSONEncodeError) as error:
             message = (

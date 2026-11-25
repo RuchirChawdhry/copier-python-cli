@@ -2,8 +2,10 @@
 
 from io import StringIO
 from pathlib import Path
+from typing import Annotated
 
-from cyclopts import App, Parameter
+from cyclopts import App, ArgumentCollection, Group, Parameter, validators
+from cyclopts.config import Yaml
 from loguru import logger
 from rich.console import Console
 from rich.table import Table
@@ -15,6 +17,13 @@ from . import config as settings
 from .doctor import CHECK_COUNT, run_checks
 from .output import Output, OutputOptions
 
+CONFIG_ACTIONS = Group("Configuration actions", validator=validators.MutuallyExclusive())
+CONFIG_PATH_EXCLUSION = Group(
+    "Configuration path restriction", show=False, validator=validators.MutuallyExclusive()
+)
+Verbosity = Annotated[int | None, Parameter(validator=validators.Number(gte=0, lte=3))]
+ConfigFile = Annotated[Path | None, Parameter(validator=validators.Path(dir_okay=False))]
+
 app = App(
     name="{{ cli_command }}",
     default_parameter=Parameter(negative=()),
@@ -23,13 +32,21 @@ app = App(
 )
 
 
-@app.command
+def command_defaults(app: App, commands: tuple[str, ...], arguments: ArgumentCollection) -> None:
+    """Select the settings file; let Cyclopts load, merge and validate its CLI defaults."""
+    config_argument, _, _ = arguments.match("--config")
+    tokens = config_argument.tokens
+    path = Path(tokens[0].value) if tokens else settings.default_config_path()
+    Yaml(path, root_keys=("cli",), encoding="utf-8")(app, commands, arguments)
+
+
+@app.command(config=command_defaults)
 def hello(
     name: str = "world",
     *,
-    config: Path | None = None,
-    verbosity: int | None = None,
-    options: OutputOptions | None = None,
+    config: ConfigFile = None,
+    verbosity: Verbosity = None,
+    options: OutputOptions = OutputOptions(),
 ) -> None:
     """Print a friendly greeting; demonstrate logging and structured results."""
     output = Output(options)
@@ -50,10 +67,10 @@ def hello(
 @app.default
 def configuration(
     *,
-    init_config: bool = False,
-    config_path: bool = False,
-    show_config: bool = False,
-    path: Path | None = None,
+    init_config: Annotated[bool, Parameter(group=CONFIG_ACTIONS)] = False,
+    config_path: Annotated[bool, Parameter(group=(CONFIG_ACTIONS, CONFIG_PATH_EXCLUSION))] = False,
+    show_config: Annotated[bool, Parameter(group=CONFIG_ACTIONS)] = False,
+    path: Annotated[ConfigFile, Parameter(group=CONFIG_PATH_EXCLUSION)] = None,
     options: OutputOptions = OutputOptions(),
 ) -> None:
     """Manage the application configuration.
@@ -67,19 +84,12 @@ def configuration(
     """
     output = Output(options)
     with output.guard():
-        count = sum((init_config, config_path, show_config))
-        if count > 1:
-            raise ValueError(
-                "--init-config, --config-path and --show-config are mutually exclusive"
-            )
-        if count == 0:
+        if not (init_config or config_path or show_config):
             if path is not None or options != OutputOptions():
                 raise ValueError("Select a configuration flag or a subcommand")
             app.help_print([])
             return
         if config_path:
-            if path is not None:
-                raise ValueError("--path cannot be combined with --config-path")
             result = str(settings.default_config_path())
             output.emit({"path": result}, human=result)
             return
@@ -99,7 +109,7 @@ def configuration(
 
 @app.command
 def set_config(
-    key: str, value: str, *, path: Path | None = None, options: OutputOptions | None = None
+    key: str, value: str, *, path: ConfigFile = None, options: OutputOptions = OutputOptions()
 ) -> None:
     """Set a dotted configuration key to a YAML value."""
     output = Output(options)
@@ -110,7 +120,7 @@ def set_config(
 
 
 @app.command
-def doctor(*, options: OutputOptions | None = None) -> None:
+def doctor(*, options: OutputOptions = OutputOptions()) -> None:
     """Diagnose Python, platform, configuration, paths and SQLite without writing."""
     output = Output(options)
     with output.guard():
@@ -132,7 +142,7 @@ def doctor(*, options: OutputOptions | None = None) -> None:
 
 
 @app.command
-def db_path(*, options: OutputOptions | None = None) -> None:
+def db_path(*, options: OutputOptions = OutputOptions()) -> None:
     """Print the default SQLite database path without initializing it."""
     output = Output(options)
     with output.guard():
@@ -141,7 +151,7 @@ def db_path(*, options: OutputOptions | None = None) -> None:
 
 
 @app.command
-def db_list(*, path: Path | None = None, options: OutputOptions | None = None) -> None:
+def db_list(*, path: ConfigFile = None, options: OutputOptions = OutputOptions()) -> None:
     """List records in deterministic key order."""
     output = Output(options)
     with output.guard():

@@ -45,6 +45,7 @@ def test_generated_package_metadata(generated: Path) -> None:
         any(dependency.startswith(name) for dependency in config["project"]["dependencies"])
         for name in ("cyclopts", "loguru", "orjson", "platformdirs", "rich", "ruamel.yaml")
     )
+    assert any(dep.startswith("cyclopts[yaml]") for dep in config["project"]["dependencies"])
     assert set(config["dependency-groups"]["dev"]) == {"pytest", "ruff"}
     assert (generated / "src" / "sample_cli" / "cli.py").is_file()
     config_source = generated / "src" / "sample_cli" / "config.py"

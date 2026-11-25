@@ -59,6 +59,35 @@ The example `hello` command initializes logging at command execution; use the sa
 pattern in new business commands. Help and configuration commands do not create logs.
 Do not store secrets in the YAML file or write them to logs.
 
+### Command argument defaults
+
+Cyclopts owns argument validation and default-value precedence. Put optional command
+defaults in the same YAML file, under the `cli` namespace:
+
+```yaml
+cli:
+  hello:
+    name: Ada
+    verbosity: 1
+```
+
+```sh
+uv run {{ cli_command }} hello --json
+uv run {{ cli_command }} hello --name Grace --json
+uv run {{ cli_command }} set-config cli.hello.name Ada
+```
+
+Explicit CLI arguments override YAML values, which override Python defaults.
+The sample hello command uses Cyclopts' native Yaml loader with the default
+platformdirs config file or the explicitly supplied `--config` file. The small
+config callback only selects that path; Cyclopts performs conversion, default
+injection and validation. Do not put the config selector itself in YAML.
+Other commands can opt in to the same loader when they need argument defaults.
+Configuration management and diagnostics do not inject command defaults, so a
+bad CLI default can still be inspected and corrected. ruamel.yaml remains
+responsible for persistent settings, safe loading and comment-preserving writes.
+The Cyclopts YAML extra supplies PyYAML for the native loader.
+
 ### Optional logging decorators
 
 Configure `LoggingConfig` once before invoking decorated functions. Ordinary
@@ -131,7 +160,9 @@ Pass these shared options after any application subcommand or alongside the root
 JSON/JSONL automatically disable progress and ANSI styling, including when FORCE_COLOR
 is set; they are mutually exclusive. No separate color flag is needed. Human-readable
 results use Rich's automatic terminal and color detection.
-Quiet and verbose are mutually exclusive. Logs, progress and errors go to stderr;
+Quiet and verbose are mutually exclusive. Cyclopts group validators reject conflicting
+flags before command execution, and its numeric validator constrains CLI verbosity.
+Logs, progress and errors go to stderr;
 commands exit nonzero on errors. Cyclopts help and parse errors remain textual.
 The legacy numeric `hello --verbosity` option is retained. Verbose raises the
 console level to at least DEBUG; quiet suppresses console logs, not file logs.
@@ -142,7 +173,8 @@ are converted to strings. orjson represents non-finite floats as null and reject
 integers outside its supported 64-bit range. Encoding errors return nonzero.
 
 For new commands, use the flattened `OutputOptions` parameter, initialize
-`Output(options)`, enter `output.guard()` before side effects, and return results
+`Output(options)`, declare restrictions with Cyclopts Parameter and Group validators, use
+`output.guard()` for application failures, and return results
 through `output.emit(data)`. For long-running operations use `output.track()`
 or `output.progress()`; both render on stderr only for interactive human output.
 
