@@ -10,6 +10,7 @@ from typing import Annotated
 
 from cyclopts import App, ArgumentCollection, Group, Parameter, validators
 from cyclopts.config import Yaml
+from cyclopts.types import File
 from loguru import logger
 from rich.console import Console
 from rich.table import Table
@@ -28,7 +29,6 @@ CONFIG_PATH_EXCLUSION = Group(
     "Configuration path restriction", show=False, validator=validators.MutuallyExclusive()
 )
 Verbosity = Annotated[int | None, Parameter(validator=validators.Number(gte=0, lte=3))]
-ConfigFile = Annotated[Path | None, Parameter(validator=validators.Path(dir_okay=False))]
 
 app = App(
     name="{{ cli_command }}",
@@ -50,7 +50,7 @@ def command_defaults(app: App, commands: tuple[str, ...], arguments: ArgumentCol
 def hello(
     name: str = "world",
     *,
-    config: ConfigFile = None,
+    config: File | None = None,
     verbosity: Verbosity = None,
     options: OutputOptions = OutputOptions(),
 ) -> None:
@@ -69,7 +69,7 @@ def hello(
     output.emit({"message": message}, human=message)
 
 
-def _initialize_config(output: Output, path: ConfigFile) -> None:
+def _initialize_config(output: Output, path: Path | None) -> None:
     output.note("Initializing YAML configuration")
     result = str(settings.init_config(path))
     output.emit({"path": result}, human=result)
@@ -80,7 +80,7 @@ def _display_config_path(output: Output) -> None:
     output.emit({"path": result}, human=result)
 
 
-def _display_config(output: Output, path: ConfigFile) -> None:
+def _display_config(output: Output, path: Path | None) -> None:
     output.note("Reading YAML configuration")
     config = settings.read_settings(path)
     stream = StringIO()
@@ -95,7 +95,7 @@ def configuration(
     init_config: Annotated[bool, Parameter(group=CONFIG_ACTIONS)] = False,
     config_path: Annotated[bool, Parameter(group=(CONFIG_ACTIONS, CONFIG_PATH_EXCLUSION))] = False,
     show_config: Annotated[bool, Parameter(group=CONFIG_ACTIONS)] = False,
-    path: Annotated[ConfigFile, Parameter(group=CONFIG_PATH_EXCLUSION)] = None,
+    path: Annotated[File | None, Parameter(group=CONFIG_PATH_EXCLUSION)] = None,
     options: OutputOptions = OutputOptions(),
 ) -> None:
     """Manage the application configuration.
@@ -122,9 +122,10 @@ def configuration(
     app.help_print([])
 
 
+
 @app.command
 def set_config(
-    key: str, value: str, *, path: ConfigFile = None, options: OutputOptions = OutputOptions()
+    key: str, value: str, *, path: File | None = None, options: OutputOptions = OutputOptions()
 ) -> None:
     """Set a dotted configuration key to a YAML value."""
     output = Output(options)
@@ -162,7 +163,7 @@ def db_path(*, options: OutputOptions = OutputOptions()) -> None:
 
 
 @app.command
-def db_list(*, path: ConfigFile = None, options: OutputOptions = OutputOptions()) -> None:
+def db_list(*, path: File | None = None, options: OutputOptions = OutputOptions()) -> None:
     """List records in deterministic key order."""
     output = Output(options)
     output.note("Listing SQLite records")

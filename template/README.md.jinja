@@ -59,6 +59,21 @@ The example `hello` command initializes logging at command execution; use the sa
 pattern in new business commands. Help and configuration commands do not create logs.
 Do not store secrets in the YAML file or write them to logs.
 
+### Native parameter types
+
+Prefer predefined `cyclopts.types` aliases over equivalent custom annotations.
+The CLI uses `File | None` for optional file paths: existing files and new paths
+are accepted, directories are rejected. No extension is required; this supports
+both `.yml` and `.yaml` as well as SQLite filenames.
+
+Use `ExistingFile` or `ExistingDirectory` when the target must already exist,
+`NonExistentFile` for a new output target, `Directory` for a directory that may
+need creation, and `PositiveInt`, `NonNegativeInt` or `Port` for matching numeric
+constraints. Use custom validators only for project-specific restrictions, such
+as logging verbosity from 0 through 3.
+
+See [Cyclopts types](https://cyclopts.readthedocs.io/en/stable/types.html).
+
 ### Command argument defaults
 
 Cyclopts owns argument validation and default-value precedence. Put optional command
