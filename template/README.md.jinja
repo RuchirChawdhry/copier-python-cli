@@ -146,14 +146,49 @@ For new commands, use the flattened `OutputOptions` parameter, initialize
 through `output.emit(data)`. For long-running operations use `output.track()`
 or `output.progress()`; both render on stderr only for interactive human output.
 
-## Develop
+## Development tasks
+
+Install [Go Task](https://taskfile.dev/docs/installation) and uv. Run `task --list` to see
+the available commands.
+
+| Command | Purpose |
+| --- | --- |
+| `task setup` | Initialize the uv development environment |
+| `task dev` | Run the CLI in development mode; show help if no arguments are provided |
+| `task test` | Run tests affected by changed code using pytest-testmon |
+| `task test:all` | Run all tests and refresh the test selection baseline |
+| `task lint` | Check lint and formatting |
+| `task fix` | Fix safe lint violations and format the code |
+| `task build` | Build wheel and source distribution |
+| `task install` | Install into the user tool directory and configure PATH |
+| `task clean` | Remove build outputs, bytecode and test/lint caches |
+| `task doctor` | Run application environment diagnostics |
+| `task update` | Upgrade dependencies in uv.lock and sync |
 
 ```sh
-uv run pytest -q
-uv run ruff check .
-uv run ruff format --check .
-uv build
+task setup
+task dev -- hello --json
+task test
+task test:all
+task doctor -- --json
+task install
 ```
+
+Test selection uses pytest-testmon's observed Python execution coverage, not Git file
+name guesses. The first run establishes a baseline; an empty or invalid baseline
+may trigger a full run. The cache is local and ignored by Git. Subprocess code,
+external resources and dynamic behavior may not be tracked completely, so run
+`task test:all` for final verification. To run a particular test manually, use
+`uv run pytest tests/test_config.py -q`.
+
+Installation prefers `uv tool install --reinstall --python 3.14.7 .` and configures
+the executable directory through `uv tool update-shell`. If uv is absent, it uses
+pipx with an available Python 3.14 interpreter and `pipx ensurepath`. Start a new
+shell if the updated PATH is not available in the current session. Other development
+tasks require uv. Installation does not write to the project's virtual environment.
+
+Cleaning preserves .venv, uv.lock, source files, configuration, logs and the user's
+SQLite database. It resets the local test-selection baseline.
 
 `src/{{ package_name }}/cli.py` is the command interface. Put logic in separate modules and test those first.
 See `AGENTS.md` for TDD and environment isolation conventions.

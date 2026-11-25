@@ -4,6 +4,7 @@ import tomllib
 from pathlib import Path
 
 import pytest
+import yaml
 from copier import run_copy
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -45,7 +46,7 @@ def test_generated_package_metadata(generated: Path) -> None:
         any(dependency.startswith(name) for dependency in config["project"]["dependencies"])
         for name in ("cyclopts", "loguru", "orjson", "platformdirs", "rich", "ruamel.yaml")
     )
-    assert set(config["dependency-groups"]["dev"]) == {"pytest", "ruff"}
+    assert set(config["dependency-groups"]["dev"]) == {"pytest", "pytest-testmon", "ruff"}
     assert (generated / "src" / "sample_cli" / "cli.py").is_file()
     config_source = generated / "src" / "sample_cli" / "config.py"
     assert config_source.is_file()
@@ -78,3 +79,32 @@ def test_generated_project_has_agent_and_update_context(generated: Path) -> None
     assert (generated / ".copier-answers.yml").is_file()
     assert (generated / "config.example.yml").is_file()
     assert not (generated / "copier.yml").exists()
+
+
+def test_generated_taskfile(generated: Path) -> None:
+    taskfile = yaml.safe_load((generated / "Taskfile.yml").read_text(encoding="utf-8"))
+    tasks = taskfile["tasks"]
+    assert set(tasks) == {
+        "setup",
+        "dev",
+        "test",
+        "test:all",
+        "lint",
+        "fix",
+        "build",
+        "install",
+        "clean",
+        "doctor",
+        "update",
+    }
+    assert tasks["setup"]["cmds"] == ["uv sync --group dev"]
+    assert tasks["dev"]["cmds"] == [
+        "uv run sample-cli {{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}--help{{end}}"
+    ]
+    assert tasks["test"]["cmds"][0] == "uv run pytest --testmon -q {{.CLI_ARGS}}"
+    assert "--testmon-noselect" in tasks["test:all"]["cmds"][0]
+    assert tasks["doctor"]["cmds"] == ["uv run sample-cli doctor {{.CLI_ARGS}}"]
+    install = tasks["install"]["cmds"][0]
+    assert "uv tool install --reinstall --python 3.14.7 ." in install
+    assert "uv tool update-shell" in install
+    assert "pipx ensurepath" in install

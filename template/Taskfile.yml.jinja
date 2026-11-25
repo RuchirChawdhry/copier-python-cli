@@ -1,0 +1,75 @@
+version: '3'
+
+tasks:
+  setup:
+    desc: Initialize the development environment
+    cmds:
+      - uv sync --group dev
+
+  dev:
+    desc: Run the application from the development environment
+    cmds:
+      - uv run {{ cli_command }} {% raw %}{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}--help{{end}}{% endraw %}
+
+  test:
+    desc: Run tests affected by code changes (first run establishes a baseline)
+    cmds:
+      - uv run pytest --testmon -q {% raw %}{{.CLI_ARGS}}{% endraw %}
+
+  test:all:
+    desc: Run all tests and refresh the test selection baseline
+    cmds:
+      - uv run pytest --testmon --testmon-noselect -q
+
+  lint:
+    desc: Check lint rules and formatting
+    cmds:
+      - uv run ruff check .
+      - uv run ruff format --check .
+
+  fix:
+    desc: Automatically fix lint violations and format code
+    cmds:
+      - uv run ruff check --fix --exit-zero .
+      - uv run ruff format .
+      - uv run ruff check .
+
+  build:
+    desc: Build the wheel and source distribution
+    cmds:
+      - uv build
+
+  install:
+    desc: Install the CLI into an isolated user tool environment and configure PATH
+    cmds:
+      - |
+        if command -v uv >/dev/null 2>&1; then
+          uv tool install --reinstall --python 3.14.7 . && uv tool update-shell
+        elif command -v pipx >/dev/null 2>&1; then
+          pipx install --force --python 3.14 . && pipx ensurepath
+        else
+          echo "Install uv (preferred) or pipx with Python 3.14 first." >&2
+          exit 1
+        fi
+
+  clean:
+    desc: Remove project build artifacts and test caches
+    cmds:
+      - rm -rf build dist .pytest_cache .ruff_cache .coverage .coverage.* .testmondata*
+      - >-
+        uv run --no-project --python 3.14.7 python -c
+        "from pathlib import Path; from shutil import rmtree;
+        roots = (Path('src'), Path('tests'));
+        [rmtree(p) for root in roots for pattern in ('__pycache__', '*.egg-info')
+        for p in list(root.rglob(pattern)) if p.is_dir() and not p.is_symlink()]"
+
+  doctor:
+    desc: Diagnose application environment problems
+    cmds:
+      - uv run {{ cli_command }} doctor {% raw %}{{.CLI_ARGS}}{% endraw %}
+
+  update:
+    desc: Upgrade locked dependencies and synchronize the development environment
+    cmds:
+      - uv lock --upgrade
+      - uv sync --group dev
