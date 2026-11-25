@@ -17,3 +17,5 @@ The local workflow is a thin caller of the central [wiki-publish.yml](https://gi
 ## Documentation website and AI-readable files
 
 The same source pages also build a Starlight site through the central wiki-pages workflow. Set Settings → Pages → Source to GitHub Actions before the first deployment. The website publishes HTML, a sitemap, llms.txt, llms-full.txt and individual Markdown mirrors. Edit wiki/ once; both publication workflows use it. These website files are not copied into generated applications.
+
+The centralized structured-data generator adds JSON-LD in the HTML head only. It does not add metadata panels or breadcrumbs to the rendered page body.
