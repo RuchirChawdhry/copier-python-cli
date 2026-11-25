@@ -221,3 +221,42 @@ def test_configuration_dispatches_only_selected_action(tmp_path: Path, monkeypat
     assert not path.exists()
     configuration(init_config=True)
     assert path.is_file()
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["--init-config", "--path"],
+        ["--show-config", "--path"],
+        ["set-config", "logging.verbosity", "1", "--path"],
+        ["db-list", "--path"],
+    ],
+)
+def test_file_parameters_reject_directories(args: list[str], tmp_path: Path) -> None:
+    with pytest.raises(ValidationError):
+        app.parse_args([*args, str(tmp_path)], exit_on_error=False, print_error=False)
+
+
+@pytest.mark.parametrize("suffix", [".yml", ".yaml", ".sqlite3", ""])
+@pytest.mark.parametrize("exists", [False, True])
+def test_file_parameter_accepts_existing_and_new_paths(
+    suffix: str, exists: bool, tmp_path: Path
+) -> None:
+    path = tmp_path / f"example{suffix}"
+    if exists:
+        path.touch()
+    _, bound, _ = app.parse_args(
+        ["--init-config", "--path", str(path)], exit_on_error=False, print_error=False
+    )
+    assert bound.arguments["path"] == path
+    assert path.exists() is exists
+
+
+def test_config_file_parameter_accepts_yml(monkeypatch, tmp_path: Path) -> None:
+    path = tmp_path / "config.yml"
+    path.write_text("logging:\n  file_enabled: false\n", encoding="utf-8")
+    monkeypatch.setattr(settings, "default_config_path", lambda: path)
+    _, bound, _ = app.parse_args(
+        ["hello", "--config", str(path)], exit_on_error=False, print_error=False
+    )
+    assert bound.arguments["config"] == path
