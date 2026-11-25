@@ -8,7 +8,7 @@ from cyclopts import ValidationError
 from loguru import logger
 
 from {{ package_name }} import config as settings
-from {{ package_name }}.cli import app, hello
+from {{ package_name }}.cli import app, configuration, hello
 from {{ package_name }}.database import set_record
 
 
@@ -197,3 +197,27 @@ def test_platform_yaml_defaults(monkeypatch, tmp_path: Path) -> None:
     assert bound.arguments["options"].verbose
     _, bound, _ = app.parse_args(["hello", "--name", "Grace"], exit_on_error=False)
     assert bound.arguments["name"] == "Grace"
+
+
+@pytest.mark.parametrize("args", [["--path", "custom.yml"], ["--json"], ["--quiet"]])
+def test_configuration_requires_action_for_options(args: list[str]) -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "{{ package_name }}", *args],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert result.stdout == ""
+    assert "Select a configuration flag" in result.stderr
+
+
+def test_configuration_dispatches_only_selected_action(tmp_path: Path, monkeypatch) -> None:
+    path = tmp_path / "config.yml"
+    monkeypatch.setattr(settings, "default_config_path", lambda: path)
+    configuration(config_path=True)
+    assert not path.exists()
+    configuration(show_config=True)
+    assert not path.exists()
+    configuration(init_config=True)
+    assert path.is_file()
