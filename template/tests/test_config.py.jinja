@@ -1,8 +1,18 @@
+import io
 from pathlib import Path
 
 import pytest
+from loguru import logger
 
-from {{ package_name }}.config import load_config
+from {{ package_name }} import config
+from {{ package_name }}.config import (
+    LoggingConfig,
+    default_settings,
+    init_config,
+    load_config,
+    read_settings,
+    update_setting,
+)
 
 
 def test_load_yaml_mapping(tmp_path: Path) -> None:
@@ -17,3 +27,79 @@ def test_reject_non_mapping(tmp_path: Path, content: str) -> None:
     config_file.write_text(content, encoding="utf-8")
     with pytest.raises(ValueError, match="YAML mapping"):
         load_config(config_file)
+
+
+def test_platform_paths(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(config, "user_config_path", lambda *args, **kwargs: tmp_path / "config")
+    monkeypatch.setattr(config, "user_log_path", lambda *args, **kwargs: tmp_path / "logs")
+    assert config.default_config_path() == tmp_path / "config" / "config.yml"
+    assert config.default_log_path() == tmp_path / "logs" / "app.log"
+    assert read_settings() == default_settings()
+    assert not config.default_config_path().exists()
+
+
+def test_explicit_missing_file(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError):
+        read_settings(tmp_path / "missing.yml")
+
+
+def test_init_and_update(tmp_path: Path) -> None:
+    path = tmp_path / "nested" / "config.yml"
+    assert init_config(path) == path
+    assert load_config(path) == default_settings()
+    with pytest.raises(FileExistsError):
+        init_config(path)
+    path.write_text(path.read_text(encoding="utf-8") + "# Keep this comment\n", encoding="utf-8")
+    update_setting("logging.verbosity", "2", path)
+    update_setting("application.retries", "3", path)
+    update_setting("application.enabled", "true", path)
+    settings = load_config(path)
+    assert settings["logging"]["verbosity"] == 2
+    assert settings["application"] == {"retries": 3, "enabled": True}
+    assert "# Keep this comment" in path.read_text(encoding="utf-8")
+    original = path.read_bytes()
+    with pytest.raises(ValueError, match="verbosity"):
+        update_setting("logging.verbosity", "9", path)
+    assert path.read_bytes() == original
+
+
+def test_update_creates_missing_file(tmp_path: Path) -> None:
+    path = tmp_path / "config.yml"
+    update_setting("application.name", '"demo"', path)
+    assert read_settings(path)["application"] == {"name": "demo"}
+    assert read_settings(path)["logging"] == default_settings()["logging"]
+
+
+@pytest.mark.parametrize(
+    "settings",
+    [{"level": "invalid"}, {"verbosity": -1}, {"verbosity": True}, {"file_enabled": "false"}],
+)
+def test_invalid_logging(settings: dict) -> None:
+    with pytest.raises(ValueError):
+        LoggingConfig(**settings)
+
+
+def test_logging_sinks(monkeypatch, tmp_path: Path) -> None:
+    output = io.StringIO()
+    path = tmp_path / "logs" / "app.log"
+    monkeypatch.setattr(config.sys, "stderr", output)
+    monkeypatch.setattr(config, "default_log_path", lambda: path)
+    try:
+        settings = LoggingConfig(level="INFO", verbosity=0)
+        settings.configure(verbosity=2)
+        logger.debug("console only")
+        logger.info("both sinks")
+        assert "console only" in output.getvalue()
+        assert "both sinks" in output.getvalue()
+        assert settings.verbosity == 0
+        assert "both sinks" in path.read_text(encoding="utf-8")
+        assert "console only" not in path.read_text(encoding="utf-8")
+        output.truncate(0)
+        output.seek(0)
+        LoggingConfig(file_enabled=False).configure()
+        logger.info("hidden")
+        logger.warning("warning")
+        assert "hidden" not in output.getvalue()
+        assert "warning" in output.getvalue()
+    finally:
+        logger.remove()

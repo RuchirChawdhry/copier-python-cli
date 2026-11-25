@@ -2,7 +2,7 @@
 
 A lean, reusable Copier template for agent-ready Python CLI applications. ⚡
 
-**Stack:** uv · Python 3.14.7 · Cyclopts · ruamel.yaml · Rich · Ruff · pytest.
+**Stack:** uv · Python 3.14.7 · Cyclopts · ruamel.yaml · Rich · platformdirs · Loguru · Ruff · pytest.
 
 ## Generate a project
 
@@ -22,7 +22,8 @@ Commit the generated `uv.lock` for reproducible development and CI.
 ## What's generated?
 
 - Installable `src/` package using uv_build and an executable Cyclopts command.
-- Rich terminal output plus a safe ruamel.yaml config reader and sample YAML.
+- Rich terminal output, persistent per-user YAML settings via ruamel.yaml and platformdirs.
+- Config commands to initialize, locate, show and update settings; Loguru file and stderr logging.
 - Real pytest tests for logic and CLI, Ruff formatting/lint settings, `.python-version`.
 - `AGENTS.md` with repo-local TDD and agent-environment guidance.
 - PR-only GitHub Actions callers for the central **python-cli** and **python-build** workflows.
